@@ -1,0 +1,8 @@
+[package]
+name = "efficient-route-planning-freiburg"
+version = "0.1.0"
+authors = ["peculiarOne <wayne@campbellscorner.org.uk>"]
+edition = "2018"
+
+[dependencies]
+quick-xml = "0.12.0"
