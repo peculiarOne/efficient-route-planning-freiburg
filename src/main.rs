@@ -2,7 +2,7 @@ extern crate quick_xml;
 
 use quick_xml::events::Event;
 use quick_xml::Reader;
-use quick_xml::events::attributes::Attribute;
+use quick_xml::events::attributes::{Attribute, Attributes};
 use std::collections::HashMap;
 use std::fs;
 
@@ -45,14 +45,14 @@ fn read_from_osm_xml() -> () {
                     b"way" => in_way = true,
                     b"nd" if in_way => {
                         // TODO attributes() returns an iterator. need to find the "ref" attribute
-                        let first_attr = e.attributes().next().unwrap();
-                        let node_ref = match &first_attr {
+                        let node_ref = e.attributes().next().unwrap();
+                        match &node_ref {
                             Ok(Attribute { 
                                 key: b"ref",
                                 value: v }) => Some(v),
                             _ => None,
                         };
-                        print!("got attrbute {}", first_attr);
+                        print!("got attrbute {}", node_ref);
                     },
                     _ => (),
                 }
@@ -66,4 +66,13 @@ fn read_from_osm_xml() -> () {
             _ => (),
         }
     }
+}
+
+// TODO read chaper on generics and lifetimes, https://doc.rust-lang.org/stable/book/ch10-00-generics.html
+fn find_attribute(attributes: Attributes, key: &[u8]) -> (Option<Result<Attribute, quick_xml::Error>>) {
+    let found = attributes.find(|att| {
+        let ua = att.unwrap();
+        ua.key == key
+    });
+    found
 }
