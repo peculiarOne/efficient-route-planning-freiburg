@@ -1,10 +1,10 @@
 extern crate quick_xml;
 
-use quick_xml::events::{BytesStart,Event};
-use quick_xml::Reader;
 use quick_xml::events::attributes::{Attribute, Attributes};
-use std::collections::HashMap;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::Reader;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fs;
 
 fn main() {
@@ -23,9 +23,7 @@ struct Network {
     outbound_arcs: HashMap<NodeId, Vec<Arc>>,
 }
 
-fn process_way() {
-
-}
+fn process_way() {}
 
 fn read_from_osm_xml() -> () {
     let file = "data/rutland-latest.osm.xml";
@@ -47,25 +45,29 @@ fn read_from_osm_xml() -> () {
                     b"nd" if in_way => {
                         // TODO attributes() returns an iterator. need to find the "ref" attribute
                         let node_ref = e.attributes().next().unwrap();
-                        match &node_ref {
-                            Ok(Attribute { 
+                        let val: Option<NodeId> = match &node_ref {
+                            Ok(Attribute {
                                 key: b"ref",
-                                value: v }) => Some(v),
+                                value: v,
+                            }) => {
+                                let s = String::from_utf8(v.to_vec()).unwrap();
+                                let id:u64 = s.parse().unwrap();
+                                Some(id)
+                            },
                             _ => None,
                         };
                         // print!("got attrbute {}", node_ref);
-                    },
+                    }
                     b"tag" if in_way => {
                         way_is_highway |= is_highway(e);
-                    },
+                    }
                     _ => (),
                 }
-            },
+            }
             Ok(Event::End(ref e)) if e.name() == b"way" => {
-                if way_is_highway {
-                };
+                if way_is_highway {};
                 in_way = false;
-            },
+            }
             Ok(Event::Eof) => break,
             _ => (),
         }
@@ -78,16 +80,47 @@ fn is_highway(tag: BytesStart) -> bool {
 
     let osm_highway = "highway".as_bytes();
 
-    let k_value = find_attribute_value(tag.attributes(), osm_key);
-    match k_value.map(|x| x.unwrap() == osm_highway) {
-        Some(b) => b,
-        None => false
+    let mut found_highway_tag = false;
+    for attribute in tag.attributes() {
+        match attribute {
+            Ok(ref attr) if attr.key == osm_key => {
+                if attr.unescaped_value().unwrap() == osm_highway {
+                    found_highway_tag = true;
+                }
+            }
+            _ => (),
+        }
     }
+    found_highway_tag
 }
 
-fn find_attribute_value<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Option<Result<Cow<'a, [u8]>, quick_xml::Error>>) {
-    let to_match: &[u8] = &[1];
-    attributes.find(|a| a.unwrap().key == key).map(|a| a.unwrap().unescaped_value())
+fn find_attributes<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Vec<Attribute<'a>>) {
+    let f = attributes
+        .filter_map(|attr_result| match attr_result {
+            Ok(ref attr) if *attr.key == *key => Some(attr_result.unwrap()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    // let f = attributes.filter(|a| *a.as_ref().unwrap().key == *key).collect::<Vec<_>>();
+    f
 }
+
+// fn find_attribute_value<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Option<Result<Cow<'a, [u8]>, quick_xml::Error>>) {
+//     let f = attributes.filter_map(|a| {
+//         match a.as_ref() {
+//             Ok(attr) if *attr.key == *key => Some(a.unwrap().unescaped_value()),
+//             _ => None
+//         }
+//     }).collect::<Vec<_>>();
+//     if f.is_empty() { None } else { Some(f[0]) }
+// }
+// fn find_attribute_value<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Option<Result<Cow<'a, [u8]>, quick_xml::Error>>) {
+//     let iFirst = attributes.clone().filter(|a| *(a.unwrap().key) == *key).next();
+//     let iFirstVal = iFirst.map(|a| a.unwrap().unescaped_value());
+//     // let filtered = attributes.filter(|a| a.unwrap().key == key).map(|a| a.unwrap().unescaped_value()).collect::<Vec<_>>();
+//     // let first = filtered.first();
+//     iFirstVal
+//     // attributes.find(|a| a.unwrap().key == key).map(|a| a.unwrap().unescaped_value())
+// }
 
 // TODO read chaper on generics and lifetimes, https://doc.rust-lang.org/stable/book/ch10-00-generics.html
