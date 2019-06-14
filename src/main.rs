@@ -1,12 +1,18 @@
 extern crate quick_xml;
 
+mod utils;
+
+use failure::Fail;
 use quick_xml::events::attributes::{Attribute, Attributes};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::ErrorKind;
 use std::fs;
+use std::error::Error;
+use std::hash::{Hash, Hasher};
 
 fn main() {
     println!("Hello, world!");
@@ -14,6 +20,23 @@ fn main() {
 }
 
 type NodeId = u64;
+
+struct Node {
+    id: NodeId,
+    latitude: f64,
+    longitude: f64,
+}
+impl PartialEq for Node {
+    fn eq(&self, other: &Node) -> bool {
+        self.id == other.id
+    }
+}
+impl Eq for Node {}
+impl Hash for Node {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state)
+    }
+}
 
 struct Arc {
     head_node: NodeId,
@@ -74,21 +97,25 @@ fn process_osm_xml(xml_string: &str) -> () {
     let mut reader = Reader::from_str(&xml_string);
 
     let mut buf = Vec::new();
+    let mut all_nodes: HashSet<Node> = HashSet::new();
     let mut way_nodes: HashSet<NodeId> = HashSet::new();
     let mut in_way = false;
     let mut way_is_highway = false;
     loop {
         match reader.read_event(&mut buf) {
             Ok(Event::Start(ref e)) => {
-                println!(
-                    "start of tag {}, in_way={}",
-                    String::from_utf8(e.name().to_vec()).unwrap(),
-                    in_way
-                );
+                // println!(
+                //     "start of tag {}, in_way={}",
+                //     String::from_utf8(e.name().to_vec()).unwrap(),
+                //     in_way
+                // );
                 match e.name() {
                     b"way" => {
                         println!("<way> found");
                         in_way = true
+                    }
+                    b"node" => {
+
                     }
                     _ => (),
                 }
@@ -114,12 +141,12 @@ fn process_osm_xml(xml_string: &str) -> () {
                             Some(node_id) => way_nodes.insert(node_id),
                             _ => false,
                         };
-                        // print!("got attrbute {}", node_ref);
                     }
                     b"tag" if in_way => {
                         println!("<tag> found in way");
                         way_is_highway |= is_highway(e);
                     }
+                    b"node" => { all_nodes.insert(extract_node(e).unwrap()); },
                     _ => (),
                 }
             }
@@ -142,7 +169,27 @@ fn process_osm_xml(xml_string: &str) -> () {
         buf.clear();
     }
 
-    print!("read {} highway nodes from network", way_nodes.len())
+    println!("read {} highway nodes from network", way_nodes.len());
+    println!("create {} Nodes", all_nodes.len());
+}
+
+fn extract_node(tag: &BytesStart) -> Result<Node, Box<dyn Error>> {
+    let mut id = 0;
+    let mut lat = 0.0;
+    let mut long = 0.0;
+    for tag in tag.attributes() {
+        match tag.map_err(|e| e.compat())? {
+            Attribute{key: b"id", value: v} => id = utils::bytes_to_string(v)?.parse::<NodeId>()?,
+            Attribute{key: b"lat", value: v} => lat = utils::bytes_to_string(v)?.parse::<f64>()?,
+            Attribute{key: b"long", value: v} => long = utils::bytes_to_string(v)?.parse::<f64>()?,
+            _ => (),
+        }
+    }
+    if id == 0 || lat == 0.0 || long == 0.0 {
+        Err(Box::new(std::io::Error::new(ErrorKind::Other, "invalid node")))
+    } else {
+        Ok(Node { id: id, latitude: lat, longitude: long })
+    }
 }
 
 fn is_highway(tag: &BytesStart) -> bool {
@@ -175,23 +222,5 @@ fn find_attributes<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Vec<Attribute
     // let f = attributes.filter(|a| *a.as_ref().unwrap().key == *key).collect::<Vec<_>>();
     f
 }
-
-// fn find_attribute_value<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Option<Result<Cow<'a, [u8]>, quick_xml::Error>>) {
-//     let f = attributes.filter_map(|a| {
-//         match a.as_ref() {
-//             Ok(attr) if *attr.key == *key => Some(a.unwrap().unescaped_value()),
-//             _ => None
-//         }
-//     }).collect::<Vec<_>>();
-//     if f.is_empty() { None } else { Some(f[0]) }
-// }
-// fn find_attribute_value<'a>(attributes: Attributes<'a>, key: &[u8]) -> (Option<Result<Cow<'a, [u8]>, quick_xml::Error>>) {
-//     let iFirst = attributes.clone().filter(|a| *(a.unwrap().key) == *key).next();
-//     let iFirstVal = iFirst.map(|a| a.unwrap().unescaped_value());
-//     // let filtered = attributes.filter(|a| a.unwrap().key == key).map(|a| a.unwrap().unescaped_value()).collect::<Vec<_>>();
-//     // let first = filtered.first();
-//     iFirstVal
-//     // attributes.find(|a| a.unwrap().key == key).map(|a| a.unwrap().unescaped_value())
-// }
 
 // TODO read chaper on generics and lifetimes, https://doc.rust-lang.org/stable/book/ch10-00-generics.html

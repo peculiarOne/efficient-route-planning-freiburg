@@ -40,6 +40,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "efficient-route-planning-freiburg"
 version = "0.1.0"
 dependencies = [
+ "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-xml 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
