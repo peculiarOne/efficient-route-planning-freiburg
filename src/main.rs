@@ -10,17 +10,14 @@ use failure::Fail;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
-use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
 
 fn main() {
     println!("Hello, world!");
-    from_osm_rutland();
+    let network = from_osm_rutland();
 }
-
-fn process_way() {}
 
 fn from_osm_rutland() -> Network {
     let file = "data/rutland-latest.osm.xml";

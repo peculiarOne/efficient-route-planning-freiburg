@@ -43,7 +43,7 @@ impl Network {
         self.nodes.insert(node.id, node);
     }
 
-    pub fn get_node(&self, node_id: &NodeId) -> Option<&Node>{
+    pub fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
         self.nodes.get(node_id)
     }
 
