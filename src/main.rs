@@ -1,6 +1,10 @@
 extern crate quick_xml;
 
+mod dijkstra;
+mod network;
 mod utils;
+
+use network::{Arc, Network, Node, NodeId};
 
 use failure::Fail;
 use quick_xml::events::attributes::Attribute;
@@ -9,7 +13,6 @@ use quick_xml::Reader;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::io::ErrorKind;
 
 fn main() {
@@ -17,59 +20,9 @@ fn main() {
     from_osm_rutland();
 }
 
-type NodeId = u64;
-
-struct Node {
-    id: NodeId,
-    latitude: f64,
-    longitude: f64,
-}
-impl PartialEq for Node {
-    fn eq(&self, other: &Node) -> bool {
-        self.id == other.id
-    }
-}
-impl Eq for Node {}
-impl Hash for Node {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
-}
-
-#[derive(Clone)]
-#[derive(Debug)]
-struct Arc {
-    head_node: NodeId,
-    distance: f64,
-    cost: u64,
-}
-
-struct Network {
-    nodes: HashMap<NodeId, Node>,
-    highways_map: HashMap<NodeId, Vec<Vec<Arc>>>, // possibly mltiple arcs with the same start
-}
-impl Network {
-    fn from_nodes(nodes: HashMap<NodeId, Node>) -> Network {
-        Network {
-            nodes: nodes,
-            highways_map: HashMap::new(),
-        }
-    }
-
-    fn insert_arcs(&mut self, start_node: NodeId, arcs: Vec<Arc>) {
-        let existing = self.highways_map.entry(start_node).or_insert(vec![]);
-        existing.push(arcs);
-    }
-
-    fn total_highways(&self) -> usize {
-        self.highways_map.values().map(|v| v.len()).sum()
-    }
-}
-
 fn process_way() {}
 
 fn from_osm_rutland() -> Network {
-
     let file = "data/rutland-latest.osm.xml";
     let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
 
@@ -119,13 +72,14 @@ fn process_osm_xml(xml_string: &str) -> Network {
     let mut reader = Reader::from_str(&xml_string);
 
     let mut buf = Vec::new();
-    let mut all_nodes: HashMap<NodeId, Node> = HashMap::new();
     let mut in_way = false;
     let mut way_is_highway = false;
 
-    let mut network_arcs: Vec<(NodeId, Vec<Arc>)> = vec![];
-    let mut way_first_node: Option<NodeId> = None;
-    let mut way_arcs: Vec<Arc> = vec![];
+    let mut temp_adjacent_arcs = vec![];
+
+    let mut prev_node: Option<NodeId> = None;
+
+    let mut graph = Network::new();
 
     loop {
         match reader.read_event(&mut buf) {
@@ -142,7 +96,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
                     }
                     b"node" => {
                         let n = extract_node(e).unwrap();
-                        all_nodes.insert(n.id, n);
+                        graph.insert_node(n);
                     }
                     _ => (),
                 }
@@ -166,16 +120,12 @@ fn process_osm_xml(xml_string: &str) -> Network {
                         };
                         match val {
                             Some(node_id) => {
-                                if way_first_node.is_none() {
-                                    way_first_node = Some(node_id);
+                                if prev_node.is_none() {
+                                    prev_node = Some(node_id);
                                 } else {
-                                    let prev_id = if way_arcs.is_empty() {
-                                        way_first_node.unwrap()
-                                    } else {
-                                        way_arcs.last().unwrap().head_node
-                                    };
-                                    let prev_node = all_nodes.get(&prev_id).unwrap();
-                                    let this_node = all_nodes.get(&node_id).unwrap();
+                                    let prev_id = prev_node.unwrap();
+                                    let prev_node = graph.get_node(&prev_id).unwrap();
+                                    let this_node = graph.get_node(&node_id).unwrap();
                                     let distance = calculate_distance(&prev_node, &this_node);
                                     let cost = calculate_cost(distance);
 
@@ -184,7 +134,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
                                         distance: distance,
                                         cost: cost,
                                     };
-                                    way_arcs.push(arc);
+                                    temp_adjacent_arcs.push((prev_id, arc));
                                 }
                             }
                             _ => (),
@@ -193,7 +143,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
                     b"tag" if in_way => way_is_highway |= is_highway(e),
                     b"node" => {
                         let n = extract_node(e).unwrap();
-                        all_nodes.insert(n.id, n);
+                        graph.insert_node(n);
                     }
                     _ => (),
                 }
@@ -206,13 +156,12 @@ fn process_osm_xml(xml_string: &str) -> Network {
                 match e.name() {
                     b"way" => {
                         if way_is_highway {
-                            match way_first_node {
-                                Some(id) => network_arcs.push((id, way_arcs.to_vec())),
-                                _ => {}
-                            };
-                        };
-                        way_first_node = None;
-                        way_arcs.clear();
+                            for (k, v) in temp_adjacent_arcs.iter() {
+                                graph.insert_arc(*k, v.to_owned());
+                            }
+                        }
+                        prev_node = None;
+                        temp_adjacent_arcs.clear();
                         in_way = false;
                         way_is_highway = false;
                     }
@@ -225,15 +174,10 @@ fn process_osm_xml(xml_string: &str) -> Network {
         buf.clear();
     }
 
-    let mut graph = Network::from_nodes(all_nodes);
-    for tup in network_arcs {
-        graph.insert_arcs(tup.0, tup.1);
-    }
-
     println!("read network with {} nodes", &graph.nodes.len());
     println!(
         "read network with {} outbound arcs ",
-        &graph.highways_map.len()
+        &graph.adjacent_arcs.len()
     );
 
     graph
@@ -306,8 +250,6 @@ fn calculate_cost(distance: f64) -> (u64) {
     0
 }
 
-// TODO read chaper on generics and lifetimes, https://doc.rust-lang.org/stable/book/ch10-00-generics.html
-
 #[cfg(test)]
 mod rutland_tests {
     use super::*;
@@ -323,7 +265,7 @@ mod rutland_tests {
         assert_eq!(-0.5134241, node.unwrap().longitude);
     }
 
-#[test]
+    #[test]
     fn total_nodes() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
@@ -331,33 +273,32 @@ mod rutland_tests {
     }
 
     #[test]
-    fn total_ways() {
+    fn total_arcs() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
-        assert_eq!(4667, rutland_graph.total_highways());
-
+        assert_eq!(33477, rutland_graph.total_arcs());
     }
 
-	// <way id="3753821" version="1" timestamp="2006-10-20T13:33:58Z" changeset="0">
-	// 	<nd ref="18328098"/>
-	// 	<nd ref="18328116"/>
-	// 	<nd ref="18328115"/>
-	// 	<nd ref="18328114"/>
-	// 	<tag k="name" v="Chestnut Close"/>
-	// 	<tag k="highway" v="residential"/>
-	// 	<tag k="created_by" v="JOSM"/>
-	// </way>
+    // <way id="3753821" version="1" timestamp="2006-10-20T13:33:58Z" changeset="0">
+    // 	<nd ref="18328098"/>
+    // 	<nd ref="18328116"/>
+    // 	<nd ref="18328115"/>
+    // 	<nd ref="18328114"/>
+    // 	<tag k="name" v="Chestnut Close"/>
+    // 	<tag k="highway" v="residential"/>
+    // 	<tag k="created_by" v="JOSM"/>
+    // </way>
     #[test]
     fn chestnut_close() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
 
-        const START_NODE:NodeId = 18328098;
-        let highways = rutland_graph.highways_map.get(&START_NODE).expect("couldn't find rutland close");
-        assert!(highways.len() == 1);
-
-        let highway = highways.iter().next().unwrap();
-        assert_eq!(3, highway.len());
+        const START_NODE: NodeId = 18328098;
+        let highways = rutland_graph
+            .adjacent_arcs
+            .get(&START_NODE)
+            .expect("couldn't find rutland close");
+        assert_eq!(3, highways.len());
     }
 
     #[test]
@@ -366,6 +307,9 @@ mod rutland_tests {
 
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
-        assert!(rutland_graph.highways_map.get(&LANDUSE_BOUNDARY_START).is_none());
+        assert!(rutland_graph
+            .adjacent_arcs
+            .get(&LANDUSE_BOUNDARY_START)
+            .is_none());
     }
 }
