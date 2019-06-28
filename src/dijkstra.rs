@@ -89,5 +89,12 @@ fn test_dijsktra() {
 }
 
 fn make_dummy_network() -> Network {
-    Network::new()
+    let network_json = r#"{
+        "nodes":{},
+        "adjacent_arcs":{
+            "1": [{"head_node": 2, "distance": 4, "cost": 2}]
+        }
+    }
+    "#;
+    Network::from_json(network_json).unwrap()
 }
