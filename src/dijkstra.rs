@@ -15,7 +15,7 @@ impl Ord for Entry {
 }
 impl PartialOrd for Entry {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cost.cmp(&other.cost))
+        Some(other.cost.cmp(&self.cost))
     }
 }
 impl PartialEq for Entry {
@@ -25,23 +25,26 @@ impl PartialEq for Entry {
 }
 impl Eq for Entry {}
 
-fn run_dijsktra(source: NodeId, target: NodeId, graph: Network) -> Option<Entry> {
-    let mut best_costs: HashMap<NodeId, u64> = HashMap::new();
+fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry> {
+    let best_costs: HashMap<NodeId, u64> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
 
-    best_costs.insert(source, 0);
+    // best_costs.insert(source, 0);
     heap.push(Entry {
         node: source,
         cost: 0,
     });
 
     while let Some(entry) = heap.pop() {
+        println!("assessing node {}", entry.node);
+        print_heap(&heap);
         if entry.node == target {
             return Some(entry);
         }
 
         if is_best_cost(&entry, &best_costs) {
+            println!("found best cost of {} to node {}", entry.cost, entry.node);
             let x = graph.adjacent_arcs.get(&entry.node);
 
             x.map(|arcs| {
@@ -50,9 +53,9 @@ fn run_dijsktra(source: NodeId, target: NodeId, graph: Network) -> Option<Entry>
                         node: arc.head_node,
                         cost: arc.cost + entry.cost,
                     };
+                    println!("neighbouring arc to {}", arc.head_node);
 
                     if is_best_cost(&arc_entry, &best_costs) {
-                        best_costs.insert(arc_entry.node, arc_entry.cost);
                         heap.push(arc_entry);
                     }
                 }
@@ -60,6 +63,10 @@ fn run_dijsktra(source: NodeId, target: NodeId, graph: Network) -> Option<Entry>
         }
     }
     None
+}
+
+fn print_heap(heap: &BinaryHeap<Entry>) {
+        println!("current heap <{}>", heap.iter().map(|e| format!("(n:{}, c:{})", e.node, e.cost)).collect::<Vec<String>>().join(", "));
 }
 
 fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeId, u64>) -> bool {
@@ -86,13 +93,31 @@ fn test_best_cost() {
 #[test]
 fn test_dijsktra() {
    let dummy_network = make_dummy_network(); 
+
+do_disjktra(&dummy_network, 4, 2, 7);
+do_disjktra(&dummy_network, 1, 4, 4);
+do_disjktra(&dummy_network, 1, 3, 2);
+do_disjktra(&dummy_network, 1, 5, 4);
+do_disjktra(&dummy_network, 2, 5, 6);
+do_disjktra(&dummy_network, 5, 4, 5);
+}
+
+fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {
+    let maybe_entry = run_dijsktra(source, destination, network);
+
+    assert!(maybe_entry.is_some());
+    assert_eq!(expected_cost, maybe_entry.unwrap().cost);
 }
 
 fn make_dummy_network() -> Network {
     let network_json = r#"{
         "nodes":{},
         "adjacent_arcs":{
-            "1": [{"head_node": 2, "distance": 4, "cost": 2}]
+            "1": [{"head_node": 4, "distance": 4, "cost": 4}, {"head_node": 2, "distance": 5, "cost": 5},{"head_node": 3, "distance": 2, "cost": 2}],
+            "2": [{"head_node": 1, "distance": 5, "cost": 5}, {"head_node": 3, "distance": 4, "cost": 4},{"head_node": 5, "distance": 8, "cost": 8}],
+            "3": [{"head_node": 1, "distance": 2, "cost": 2}, {"head_node": 2, "distance": 4, "cost": 4},{"head_node": 5, "distance": 2, "cost": 2},{"head_node": 4, "distance": 3, "cost": 3}],
+            "4": [{"head_node": 1, "distance": 4, "cost": 4}, {"head_node": 3, "distance": 3, "cost": 3}],
+            "5": [{"head_node": 2, "distance": 8, "cost": 8}, {"head_node": 3, "distance": 2, "cost": 2}]
         }
     }
     "#;
