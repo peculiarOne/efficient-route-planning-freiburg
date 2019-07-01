@@ -64,6 +64,10 @@ impl Network {
     pub fn total_arcs(&self) -> usize {
         self.adjacent_arcs.values().map(|v| v.len()).sum()
     }
+
+    pub fn to_json(&self) -> Result<String> {
+        serde_json::to_string(self)
+    }
 }
 
 #[test]
