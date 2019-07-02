@@ -75,10 +75,6 @@ fn process_osm_xml(xml_string: &str) -> Network {
 
     let mut way_nodes = vec![];
 
-    let mut temp_adjacent_arcs = vec![];
-
-    let mut prev_node: Option<NodeId> = None;
-
     let mut graph = Network::new();
 
     loop {
@@ -90,10 +86,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
                 //     in_way
                 // );
                 match e.name() {
-                    b"way" => {
-                        // println!("<way> found");
-                        in_way = true
-                    }
+                    b"way" => in_way = true,
                     b"node" => {
                         let n = extract_node(e).unwrap();
                         graph.insert_node(n);
@@ -119,32 +112,14 @@ fn process_osm_xml(xml_string: &str) -> Network {
                             _ => None,
                         };
                         match val {
-                            Some(node_id) => {
-                                way_nodes.push(node_id);
-                                // if prev_node.is_none() {
-                                //     prev_node = Some(node_id);
-                                // } else {
-                                //     let prev_id = prev_node.unwrap();
-                                //     let prev_node = graph.get_node(&prev_id).unwrap();
-                                //     let this_node = graph.get_node(&node_id).unwrap();
-                                //     let distance = calculate_distance(&prev_node, &this_node);
-                                //     let cost = calculate_cost(distance);
-
-                                //     let arc = Arc {
-                                //         head_node: node_id,
-                                //         distance: distance,
-                                //         cost: cost,
-                                //     };
-                                //     temp_adjacent_arcs.push((prev_id, arc));
-                                }
-                            }
+                            Some(node_id) => way_nodes.push(node_id),
                             _ => (),
                         };
                     }
                     b"tag" if in_way => {
                         way_is_highway |= is_highway(e);
                         way_is_oneway |= is_oneway(e);
-                        },
+                    }
                     b"node" => {
                         let n = extract_node(e).unwrap();
                         graph.insert_node(n);
@@ -159,16 +134,17 @@ fn process_osm_xml(xml_string: &str) -> Network {
                 // );
                 match e.name() {
                     b"way" => {
+                        println!("end of way");
                         // TODO create arcs here including forward and reverse
                         if way_is_highway {
-                            for (k, v) in temp_adjacent_arcs.iter() {
+                            let arcs = create_arcs(&graph, &way_nodes, way_is_oneway);
+                            for (k, v) in arcs.iter() {
                                 graph.insert_arc(*k, v.to_owned());
                             }
                         }
-                        prev_node = None;
-                        temp_adjacent_arcs.clear();
                         in_way = false;
                         way_is_highway = false;
+                        way_nodes.clear();
                     }
                     _ => (),
                 }
@@ -186,6 +162,54 @@ fn process_osm_xml(xml_string: &str) -> Network {
     );
 
     graph
+}
+
+fn create_arcs(
+    partial_network: &Network,
+    way_nodes: &Vec<NodeId>,
+    is_oneway: bool,
+) -> Vec<(NodeId, Arc)> {
+    let mut way_iter = way_nodes.iter().peekable();
+
+    let mut arcs = vec![];
+    while let Some(node) = way_iter.next() {
+        let maybe_next = way_iter.peek();
+        match maybe_next {
+            Some(next) => {
+                let from = partial_network.get_node(node);
+                let to = partial_network.get_node(next);
+                match (from, to) {
+                    (Some(f), Some(t)) => {
+                        let dist = calculate_distance(f, t);
+                        let cost = calculate_cost(dist);
+
+                        arcs.push((
+                            f.id,
+                            Arc {
+                                head_node: t.id,
+                                cost: cost,
+                                distance: dist,
+                            },
+                        ));
+
+                        if !is_oneway {
+                            arcs.push((
+                                t.id,
+                                Arc {
+                                    head_node: f.id,
+                                    cost: cost,
+                                    distance: dist,
+                                },
+                            ));
+                        }
+                    }
+                    _ => (),
+                }
+            }
+            None => (),
+        }
+    }
+    arcs
 }
 
 fn extract_node(tag: &BytesStart) -> Result<Node, Box<dyn Error>> {
@@ -250,8 +274,8 @@ fn is_highway(tag: &BytesStart) -> bool {
 fn is_oneway(tag: &BytesStart) -> bool {
     let one_way_val = osm_tag_value(tag, "oneway");
     match one_way_val {
-        Some(ref val) if val == "true" => true,
-        _ => false
+        Some(ref val) if val == "yes" => true,
+        _ => false,
     }
 }
 
@@ -271,12 +295,23 @@ fn osm_tag_value(tag: &BytesStart, key_to_match: &str) -> Option<String> {
                 }
             }
             Ok(ref attr) if attr.key == osm_value => {
-                value = String::from_utf8(attr.unescaped_value().unwrap().iter().map(|u| *u).collect::<Vec<_>>()).ok();
+                value = String::from_utf8(
+                    attr.unescaped_value()
+                        .unwrap()
+                        .iter()
+                        .map(|u| *u)
+                        .collect::<Vec<_>>(),
+                )
+                .ok();
             }
             _ => (),
         }
     }
-    if found_key_to_match { value } else { None }
+    if found_key_to_match {
+        value
+    } else {
+        None
+    }
 }
 
 fn calculate_distance(a: &Node, b: &Node) -> (f64) {
@@ -328,13 +363,18 @@ mod rutland_tests {
     #[test]
     fn chestnut_close() {
         // TODO can we use a common Network across tests?
-        let rutland_graph: Network = from_osm_rutland();
+        let file = "data/rutland-tiny.osm.xml";
+        let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
+
+        let network = process_osm_xml(&xml_string);
+        // let network = from_osm_rutland();
 
         const START_NODE: NodeId = 18328098;
-        let highways = rutland_graph
+        let highways = network
             .adjacent_arcs
             .get(&START_NODE)
-            .expect("couldn't find rutland close");
+            .expect("couldn't find chesnut close");
+        println!("chestnut close adjacent arcs: {:?}", highways);
         assert_eq!(3, highways.len());
     }
 
@@ -352,15 +392,15 @@ mod rutland_tests {
 
     #[test]
     fn read_oneway() {
-    let file = "data/oneway-way.osm.xml";
-    let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
+        let file = "data/oneway-way.osm.xml";
+        let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
 
-    let network = process_osm_xml(&xml_string);
+        let network = process_osm_xml(&xml_string);
 
-    const A_NODE: NodeId = 1917341728;
+        const A_NODE: NodeId = 1917341728;
 
-    assert_eq!(12, network.total_arcs());
-    println!("network: {}", &network.to_json().unwrap());
-    assert_eq!(2, network.adjacent_arcs.get(&A_NODE).unwrap().len());
+        println!("network: {}", &network.to_json().unwrap());
+        assert_eq!(12, network.total_arcs());
+        assert_eq!(1, network.adjacent_arcs.get(&A_NODE).unwrap().len());
     }
 }

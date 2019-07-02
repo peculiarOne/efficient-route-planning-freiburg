@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version="0.6" generator="osmconvert 0.8.5" timestamp="2019-05-14T20:14:02Z">
+	<bounds minlat="52.52355" minlon="-0.822934" maxlat="52.76109" maxlon="-0.427654"/>
+
+	<node id="1917340647" lat="52.5848056" lon="-0.7326071" version="1" timestamp="2012-09-16T15:43:56Z" changeset="0"/>
+	<node id="18328099" lat="52.5857116" lon="-0.7328631" version="1" timestamp="2006-10-16T11:01:57Z" changeset="0">
+		<tag k="created_by" v="JOSM"/>
+	</node>
+	<node id="18328092" lat="52.5860663" lon="-0.7329667" version="1" timestamp="2006-10-16T11:01:54Z" changeset="0">
+		<tag k="created_by" v="JOSM"/>
+	</node>
+	<node id="18328098" lat="52.5866602" lon="-0.7331261" version="1" timestamp="2006-10-16T11:01:57Z" changeset="0">
+		<tag k="created_by" v="JOSM"/>
+	</node>
+	<node id="18253402" lat="52.5873395" lon="-0.7333466" version="2" timestamp="2018-09-07T13:15:56Z" changeset="0"/>
+	<node id="18328114" lat="52.5861412" lon="-0.7306383" version="1" timestamp="2006-10-16T11:01:59Z" changeset="0">
+		<tag k="created_by" v="JOSM"/>
+	</node>
+	<node id="18328115" lat="52.586397" lon="-0.7317271" version="1" timestamp="2006-10-16T11:01:59Z" changeset="0">
+		<tag k="created_by" v="JOSM"/>
+	</node>
+	<node id="18328116" lat="52.5866185" lon="-0.7324602" version="1" timestamp="2006-10-16T11:01:59Z" changeset="0">
+		<tag k="created_by" v="JOSM"/>
+	</node>
+		<way id="3753820" version="3" timestamp="2012-12-12T00:09:48Z" changeset="0">
+		<nd ref="18253402"/>
+		<nd ref="18328098"/>
+		<nd ref="18328092"/>
+		<nd ref="18328099"/>
+		<nd ref="1917340647"/>
+		<tag k="name" v="Newtown Road"/>
+		<tag k="highway" v="residential"/>
+		<tag k="source:name" v="OS_OpenData_Locator"/>
+	</way>
+	<way id="3753821" version="1" timestamp="2006-10-20T13:33:58Z" changeset="0">
+		<nd ref="18328098"/>
+		<nd ref="18328116"/>
+		<nd ref="18328115"/>
+		<nd ref="18328114"/>
+		<tag k="name" v="Chestnut Close"/>
+		<tag k="highway" v="residential"/>
+		<tag k="created_by" v="JOSM"/>
+	</way>
+</osm>

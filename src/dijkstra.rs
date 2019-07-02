@@ -66,7 +66,13 @@ fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry
 }
 
 fn print_heap(heap: &BinaryHeap<Entry>) {
-        println!("current heap <{}>", heap.iter().map(|e| format!("(n:{}, c:{})", e.node, e.cost)).collect::<Vec<String>>().join(", "));
+    println!(
+        "current heap <{}>",
+        heap.iter()
+            .map(|e| format!("(n:{}, c:{})", e.node, e.cost))
+            .collect::<Vec<String>>()
+            .join(", ")
+    );
 }
 
 fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeId, u64>) -> bool {
@@ -80,26 +86,31 @@ fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeId, u64>) -> bool {
 
 #[test]
 fn test_best_cost() {
-
-    assert_eq!(true, is_best_cost(&Entry { node: 1, cost: 10}, &HashMap::new()));
+    assert_eq!(
+        true,
+        is_best_cost(&Entry { node: 1, cost: 10 }, &HashMap::new())
+    );
 
     let mut best_costs = HashMap::new();
     best_costs.insert(1, 9);
 
-    assert_eq!(true, is_best_cost(&Entry { node: 1, cost: 8}, &best_costs));
-    assert_eq!(false, is_best_cost(&Entry { node: 1, cost: 11}, &best_costs));
+    assert_eq!(true, is_best_cost(&Entry { node: 1, cost: 8 }, &best_costs));
+    assert_eq!(
+        false,
+        is_best_cost(&Entry { node: 1, cost: 11 }, &best_costs)
+    );
 }
 
 #[test]
 fn test_dijsktra() {
-   let dummy_network = make_dummy_network(); 
+    let dummy_network = make_dummy_network();
 
-do_disjktra(&dummy_network, 4, 2, 7);
-do_disjktra(&dummy_network, 1, 4, 4);
-do_disjktra(&dummy_network, 1, 3, 2);
-do_disjktra(&dummy_network, 1, 5, 4);
-do_disjktra(&dummy_network, 2, 5, 6);
-do_disjktra(&dummy_network, 5, 4, 5);
+    do_disjktra(&dummy_network, 4, 2, 7);
+    do_disjktra(&dummy_network, 1, 4, 4);
+    do_disjktra(&dummy_network, 1, 3, 2);
+    do_disjktra(&dummy_network, 1, 5, 4);
+    do_disjktra(&dummy_network, 2, 5, 6);
+    do_disjktra(&dummy_network, 5, 4, 5);
 }
 
 fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {

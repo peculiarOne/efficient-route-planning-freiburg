@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<node id="1019308295" visible="true" version="1" changeset="6533159" timestamp="2010-12-03T23:32:41Z" user="stev" uid="3762" lat="52.5880694" lon="-0.7228333"/>
+<node id="18328030" visible="true" version="2" changeset="6533159" timestamp="2010-12-03T23:32:45Z" user="stev" uid="3762" lat="52.5880804" lon="-0.7234954"/>
+<node id="2190013556" visible="true" version="1" changeset="15285049" timestamp="2013-03-07T18:20:43Z" user="Chris Parker" uid="51722" lat="52.5880846" lon="-0.7238215"/>
+<node id="1916032335" visible="true" version="1" changeset="13123045" timestamp="2012-09-15T20:11:30Z" user="ca_hoot" uid="222996" lat="52.5880855" lon="-0.7238896"/>
+<node id="1019308314" visible="true" version="2" changeset="15285049" timestamp="2013-03-07T18:21:22Z" user="Chris Parker" uid="51722" lat="52.5881042" lon="-0.7243014"/>
+<node id="1916032366" visible="true" version="2" changeset="15285049" timestamp="2013-03-07T18:21:22Z" user="Chris Parker" uid="51722" lat="52.5881472" lon="-0.7247863"/>
+<node id="1019308315" visible="true" version="2" changeset="15285049" timestamp="2013-03-07T18:21:22Z" user="Chris Parker" uid="51722" lat="52.5881890" lon="-0.7251456"/>
+<node id="1019308270" visible="true" version="2" changeset="15285049" timestamp="2013-03-07T18:21:22Z" user="Chris Parker" uid="51722" lat="52.5882251" lon="-0.7254939"/>
+<node id="1917341728" visible="true" version="2" changeset="15285049" timestamp="2013-03-07T18:21:22Z" user="Chris Parker" uid="51722" lat="52.5882743" lon="-0.7260645"/>
+<node id="1019308334" visible="true" version="2" changeset="15285049" timestamp="2013-03-07T18:21:22Z" user="Chris Parker" uid="51722" lat="52.5882840" lon="-0.7262255"/>
+<node id="1917341732" visible="true" version="1" changeset="13132137" timestamp="2012-09-16T15:44:27Z" user="ca_hoot" uid="222996" lat="52.5882727" lon="-0.7265703"/>
+<node id="18328496" visible="true" version="3" changeset="39289503" timestamp="2016-05-13T11:27:39Z" user="blackadder" uid="735" lat="52.5882736" lon="-0.7269447"/>
+<node id="18253412" visible="true" version="3" changeset="39289503" timestamp="2016-05-13T11:27:39Z" user="blackadder" uid="735" lat="52.5882743" lon="-0.7270120"/>
+
+
+<osm version="0.6" generator="CGImap 0.7.5 (6500 thorn-03.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+ <way id="3727384" visible="true" version="6" changeset="15285049" timestamp="2013-03-07T18:20:46Z" user="Chris Parker" uid="51722">
+  <nd ref="1019308295"/>
+  <nd ref="18328030"/>
+  <nd ref="2190013556"/>
+  <nd ref="1916032335"/>
+  <nd ref="1019308314"/>
+  <nd ref="1916032366"/>
+  <nd ref="1019308315"/>
+  <nd ref="1019308270"/>
+  <nd ref="1917341728"/>
+  <nd ref="1019308334"/>
+  <nd ref="1917341732"/>
+  <nd ref="18328496"/>
+  <nd ref="18253412"/>
+  <tag k="abutters" v="retail"/>
+  <tag k="highway" v="unclassified"/>
+  <tag k="name" v="High Street West"/>
+  <tag k="oneway" v="yes"/>
+ </way>
+</osm>
