@@ -1,4 +1,4 @@
-extern crate quick_xml;
+1500;
 
 mod dijkstra;
 mod network;
@@ -106,8 +106,6 @@ fn process_osm_xml(xml_string: &str) -> Network {
                                 value: v,
                             }) => {
                                 let s = String::from_utf8(v.to_vec()).unwrap();
-                                let id: u64 = s.parse().unwrap();
-                                Some(id)
                             }
                             _ => None,
                         };
@@ -134,8 +132,6 @@ fn process_osm_xml(xml_string: &str) -> Network {
                 // );
                 match e.name() {
                     b"way" => {
-                        println!("end of way");
-                        // TODO create arcs here including forward and reverse
                         if way_is_highway {
                             let arcs = create_arcs(&graph, &way_nodes, way_is_oneway);
                             for (k, v) in arcs.iter() {
@@ -314,12 +310,15 @@ fn osm_tag_value(tag: &BytesStart, key_to_match: &str) -> Option<String> {
     }
 }
 
-fn calculate_distance(a: &Node, b: &Node) -> (f64) {
-    0.0
+fn calculate_distance(a: &Node, b: &Node) -> (u64) {
+
+    let from_lat_long = (a.latitude, a.longitude);
+    let to_lat_long = (b.latitude, b.longitude);
+    utils::haversine_distance_metres(from_lat_long, to_lat_long)
 }
 
-fn calculate_cost(distance: f64) -> (u64) {
-    0
+fn calculate_cost(distance: u64) -> (u64) {
+    distance
 }
 
 #[cfg(test)]

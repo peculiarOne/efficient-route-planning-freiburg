@@ -27,7 +27,7 @@ impl Hash for Node {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Arc {
     pub head_node: NodeId,
-    pub distance: f64,
+    pub distance: u64,
     pub cost: u64,
 }
 
@@ -87,7 +87,7 @@ fn serialize() {
         1,
         Arc {
             head_node: 2,
-            distance: 1.5,
+            distance: 1500,
             cost: 2,
         },
     );
