@@ -1,5 +1,5 @@
-extern crate log;
 extern crate env_logger;
+extern crate log;
 
 use crate::network::{Network, NodeId};
 
@@ -29,8 +29,13 @@ impl PartialEq for Entry {
 }
 impl Eq for Entry {}
 
-pub fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry> {
-    let best_costs: HashMap<NodeId, u64> = HashMap::new();
+pub fn run_dijsktra(
+    source: NodeId,
+    target: NodeId,
+    graph: &Network,
+    max_distance: u64,
+) -> Option<Entry> {
+    let mut costs: HashMap<NodeId, u64> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
 
@@ -39,16 +44,28 @@ pub fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<E
         node: source,
         cost: 0,
     });
+    costs.insert(source, 0);
 
+    let mut count = 0;
     while let Some(entry) = heap.pop() {
+        if max_distance > 0 && entry.cost > max_distance {
+            break;
+        }
+
+        count += 1;
+        if count % 20 == 0 {
+            print_progress(&entry, &costs, &heap)
+        }
         debug!("assessing node {}", entry.node);
         print_heap(&heap);
+
         if entry.node == target {
             return Some(entry);
         }
 
-        if is_best_cost(&entry, &best_costs) {
-            debug!("found best cost of {} to node {}", entry.cost, entry.node);
+        // if is_best_cost(&entry, &costs) {
+        {
+            // println!("found best cost of {} to node {}", entry.cost, entry.node);
             let x = graph.adjacent_arcs.get(&entry.node);
 
             x.map(|arcs| {
@@ -57,9 +74,10 @@ pub fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<E
                         node: arc.head_node,
                         cost: arc.cost + entry.cost,
                     };
-                    debug!("neighbouring arc to {}", arc.head_node);
+                    // println!("neighbouring arc to {}", arc.head_node);
 
-                    if is_best_cost(&arc_entry, &best_costs) {
+                    if is_best_cost(&arc_entry, &costs) {
+                        costs.insert(arc_entry.node, arc_entry.cost);
                         heap.push(arc_entry);
                     }
                 }
@@ -67,6 +85,20 @@ pub fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<E
         }
     }
     None
+}
+
+fn print_progress(
+    currentEntry: &Entry,
+    best_costs: &HashMap<NodeId, u64>,
+    heap: &BinaryHeap<Entry>,
+) {
+    println!("--");
+    println!(
+        "assessing node {} with cost {}",
+        currentEntry.node, currentEntry.cost
+    );
+    println!("{} entries still in heap", heap.len());
+    println!("{} entries in best_cost", best_costs.len());
 }
 
 fn print_heap(heap: &BinaryHeap<Entry>) {
@@ -118,7 +150,7 @@ fn test_dijsktra() {
 }
 
 fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {
-    let maybe_entry = run_dijsktra(source, destination, network);
+    let maybe_entry = run_dijsktra(source, destination, network, 0);
 
     assert!(maybe_entry.is_some());
     assert_eq!(expected_cost, maybe_entry.unwrap().cost);

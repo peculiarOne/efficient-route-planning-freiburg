@@ -5,7 +5,10 @@ pub fn bytes_to_string(bytes: Cow<'_, [u8]>) -> Result<String, FromUtf8Error> {
     String::from_utf8(bytes.to_vec())
 }
 
-pub fn haversine_distance_metres(from_lat_long_deg: (f64, f64), to_lat_long_deg: (f64, f64)) -> u64 {
+pub fn haversine_distance_metres(
+    from_lat_long_deg: (f64, f64),
+    to_lat_long_deg: (f64, f64),
+) -> u64 {
     const EARTH_RADIUS_KILOMETER: f64 = 6371.0_f64;
 
     let (from_lat_deg, from_long_deg) = from_lat_long_deg;

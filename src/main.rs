@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 extern crate quick_xml;
 
@@ -22,13 +23,14 @@ fn main() {
     println!("Hello, world!");
     let network = from_osm_rutland();
 
-let aytson_road: NodeId = 14048896; // from
-let poplar_close: NodeId = 18337858; // ~ 250m
-let north_street_west: NodeId = 1019308251; // ~ 500m
-let leicester_road: NodeId = 18327780; // ~ 1.2km
-let stamford_road: NodeId = 2577022506; // ~9km
-   let result = dijkstra::run_dijsktra(aytson_road, north_street_west, &network);  
-   println!("path result: {:?}", result.unwrap());
+    let oakham_the_avenue: NodeId = 3711862961;
+    let oakham_braunston_road: NodeId = 18335097;
+    let oakham_tolenthorpe_close: NodeId = 18334319;
+    let result = dijkstra::run_dijsktra(oakham_the_avenue, oakham_tolenthorpe_close, &network, 8000);
+    match result {
+        Some(entry) => println!("path result: {:?}", entry),
+        None => println!("no path found!!"),
+    }
 }
 
 fn from_osm_rutland() -> Network {
@@ -326,7 +328,6 @@ fn osm_tag_value(tag: &BytesStart, key_to_match: &str) -> Option<String> {
 }
 
 fn calculate_distance(a: &Node, b: &Node) -> (u64) {
-
     let from_lat_long = (a.latitude, a.longitude);
     let to_lat_long = (b.latitude, b.longitude);
     utils::haversine_distance_metres(from_lat_long, to_lat_long)
