@@ -1,10 +1,14 @@
+extern crate log;
+extern crate env_logger;
+
 use crate::network::{Network, NodeId};
 
 use std::cmp::{Ord, Ordering};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 
-struct Entry {
+#[derive(Debug)]
+pub struct Entry {
     node: NodeId,
     cost: u64,
 }
@@ -25,7 +29,7 @@ impl PartialEq for Entry {
 }
 impl Eq for Entry {}
 
-fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry> {
+pub fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry> {
     let best_costs: HashMap<NodeId, u64> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
@@ -37,14 +41,14 @@ fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry
     });
 
     while let Some(entry) = heap.pop() {
-        println!("assessing node {}", entry.node);
+        debug!("assessing node {}", entry.node);
         print_heap(&heap);
         if entry.node == target {
             return Some(entry);
         }
 
         if is_best_cost(&entry, &best_costs) {
-            println!("found best cost of {} to node {}", entry.cost, entry.node);
+            debug!("found best cost of {} to node {}", entry.cost, entry.node);
             let x = graph.adjacent_arcs.get(&entry.node);
 
             x.map(|arcs| {
@@ -53,7 +57,7 @@ fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry
                         node: arc.head_node,
                         cost: arc.cost + entry.cost,
                     };
-                    println!("neighbouring arc to {}", arc.head_node);
+                    debug!("neighbouring arc to {}", arc.head_node);
 
                     if is_best_cost(&arc_entry, &best_costs) {
                         heap.push(arc_entry);
@@ -66,7 +70,7 @@ fn run_dijsktra(source: NodeId, target: NodeId, graph: &Network) -> Option<Entry
 }
 
 fn print_heap(heap: &BinaryHeap<Entry>) {
-    println!(
+    debug!(
         "current heap <{}>",
         heap.iter()
             .map(|e| format!("(n:{}, c:{})", e.node, e.cost))

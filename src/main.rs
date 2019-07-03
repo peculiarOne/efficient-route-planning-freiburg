@@ -1,4 +1,6 @@
-1500;
+#[macro_use] extern crate log;
+extern crate env_logger;
+extern crate quick_xml;
 
 mod dijkstra;
 mod network;
@@ -15,8 +17,18 @@ use std::fs;
 use std::io::ErrorKind;
 
 fn main() {
+    env_logger::init();
+
     println!("Hello, world!");
     let network = from_osm_rutland();
+
+let aytson_road: NodeId = 14048896; // from
+let poplar_close: NodeId = 18337858; // ~ 250m
+let north_street_west: NodeId = 1019308251; // ~ 500m
+let leicester_road: NodeId = 18327780; // ~ 1.2km
+let stamford_road: NodeId = 2577022506; // ~9km
+   let result = dijkstra::run_dijsktra(aytson_road, north_street_west, &network);  
+   println!("path result: {:?}", result.unwrap());
 }
 
 fn from_osm_rutland() -> Network {
@@ -106,6 +118,8 @@ fn process_osm_xml(xml_string: &str) -> Network {
                                 value: v,
                             }) => {
                                 let s = String::from_utf8(v.to_vec()).unwrap();
+                                let id: u64 = s.parse().unwrap();
+                                Some(id)
                             }
                             _ => None,
                         };
@@ -132,6 +146,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
                 // );
                 match e.name() {
                     b"way" => {
+                        // TODO create arcs here including forward and reverse
                         if way_is_highway {
                             let arcs = create_arcs(&graph, &way_nodes, way_is_oneway);
                             for (k, v) in arcs.iter() {
