@@ -26,7 +26,8 @@ fn main() {
     let oakham_the_avenue: NodeId = 3711862961;
     let oakham_braunston_road: NodeId = 18335097;
     let oakham_tolenthorpe_close: NodeId = 18334319;
-    let result = dijkstra::run_dijsktra(oakham_the_avenue, oakham_tolenthorpe_close, &network, 8000);
+    let oakham_woodland_view: NodeId = 18339438;
+    let result = dijkstra::run_dijsktra(oakham_the_avenue, oakham_woodland_view, &network, 8000, true);
     match result {
         Some(entry) => println!("path result: {:?}", entry),
         None => println!("no path found!!"),
@@ -86,6 +87,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
     let mut in_way = false;
     let mut way_is_highway = false;
     let mut way_is_oneway = false;
+    let mut way_name = None;
 
     let mut way_nodes = vec![];
 
@@ -133,6 +135,10 @@ fn process_osm_xml(xml_string: &str) -> Network {
                     b"tag" if in_way => {
                         way_is_highway |= is_highway(e);
                         way_is_oneway |= is_oneway(e);
+                        match get_name(e) {
+                            Some(name) => way_name = Some(name),
+                            _ => (),
+                        }
                     }
                     b"node" => {
                         let n = extract_node(e).unwrap();
@@ -150,13 +156,14 @@ fn process_osm_xml(xml_string: &str) -> Network {
                     b"way" => {
                         // TODO create arcs here including forward and reverse
                         if way_is_highway {
-                            let arcs = create_arcs(&graph, &way_nodes, way_is_oneway);
+                            let arcs = create_arcs(&graph, &way_nodes, way_is_oneway, way_name.as_ref().map(|n| n.as_str()));
                             for (k, v) in arcs.iter() {
                                 graph.insert_arc(*k, v.to_owned());
                             }
                         }
                         in_way = false;
                         way_is_highway = false;
+                        way_name = None;
                         way_nodes.clear();
                     }
                     _ => (),
@@ -181,6 +188,7 @@ fn create_arcs(
     partial_network: &Network,
     way_nodes: &Vec<NodeId>,
     is_oneway: bool,
+    way_name: Option<&str>
 ) -> Vec<(NodeId, Arc)> {
     let mut way_iter = way_nodes.iter().peekable();
 
@@ -202,6 +210,7 @@ fn create_arcs(
                                 head_node: t.id,
                                 cost: cost,
                                 distance: dist,
+                                part_of_way: way_name.map(|n| n.into())
                             },
                         ));
 
@@ -212,6 +221,7 @@ fn create_arcs(
                                     head_node: f.id,
                                     cost: cost,
                                     distance: dist,
+                                    part_of_way: way_name.map(|n| n.into())
                                 },
                             ));
                         }
@@ -290,6 +300,10 @@ fn is_oneway(tag: &BytesStart) -> bool {
         Some(ref val) if val == "yes" => true,
         _ => false,
     }
+}
+
+fn get_name(tag: &BytesStart) -> Option<String> {
+    osm_tag_value(tag, "name")
 }
 
 fn osm_tag_value(tag: &BytesStart, key_to_match: &str) -> Option<String> {

@@ -29,6 +29,7 @@ pub struct Arc {
     pub head_node: NodeId,
     pub distance: u64,
     pub cost: u64,
+    pub part_of_way: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -89,6 +90,7 @@ fn serialize() {
             head_node: 2,
             distance: 1500,
             cost: 2,
+            partOfWay: Some("Foo Street".to_string())
         },
     );
 

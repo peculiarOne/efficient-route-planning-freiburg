@@ -7,33 +7,48 @@ use std::cmp::{Ord, Ordering};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 
-#[derive(Debug)]
-pub struct Entry {
+#[derive(Clone, Debug)]
+pub struct Entry<'a> {
     node: NodeId,
     cost: u64,
+    arc_name: Option<&'a str>,
+    prev_entry: Option<Box<Entry<'a>>>,
 }
-impl Ord for Entry {
+impl<'a> Ord for Entry<'a> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.cost.cmp(&other.cost)
     }
 }
-impl PartialOrd for Entry {
+impl<'a> PartialOrd for Entry<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(other.cost.cmp(&self.cost))
     }
 }
-impl PartialEq for Entry {
+impl<'a> PartialEq for Entry<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.node == other.node && self.cost == other.cost
     }
 }
-impl Eq for Entry {}
+impl<'a> Eq for Entry<'a> {}
+
+impl<'a> Entry<'a> {
+    pub fn report_traversed_ways(&self) -> String {
+        let mut prev_entries = vec![];
+        let mut prev = self.prev_entry;
+
+        while (prev.is_some()) {
+            prev_entries.push(prev);
+        }
+    "some path".to_string()
+    }
+}
 
 pub fn run_dijsktra(
     source: NodeId,
     target: NodeId,
     graph: &Network,
     max_distance: u64,
+    trace_path: bool,
 ) -> Option<Entry> {
     let mut costs: HashMap<NodeId, u64> = HashMap::new();
 
@@ -43,6 +58,8 @@ pub fn run_dijsktra(
     heap.push(Entry {
         node: source,
         cost: 0,
+        arc_name: None,
+        prev_entry: None,
     });
     costs.insert(source, 0);
 
@@ -70,9 +87,13 @@ pub fn run_dijsktra(
 
             x.map(|arcs| {
                 for arc in arcs {
+                    let arc_name = if trace_path { arc.part_of_way.as_ref().map(|s| s.as_str()) } else { None };
+                    let prev_entry = if trace_path { Some(Box::new(entry.clone())) } else { None };
                     let arc_entry = Entry {
                         node: arc.head_node,
                         cost: arc.cost + entry.cost,
+                        arc_name: arc_name,
+                        prev_entry: prev_entry,
                     };
                     // println!("neighbouring arc to {}", arc.head_node);
 
@@ -124,16 +145,43 @@ fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeId, u64>) -> bool {
 fn test_best_cost() {
     assert_eq!(
         true,
-        is_best_cost(&Entry { node: 1, cost: 10 }, &HashMap::new())
+        is_best_cost(
+            &Entry {
+                node: 1,
+                cost: 10,
+                arc_name: None,
+                prev_entry: None
+            },
+            &HashMap::new()
+        )
     );
 
     let mut best_costs = HashMap::new();
     best_costs.insert(1, 9);
 
-    assert_eq!(true, is_best_cost(&Entry { node: 1, cost: 8 }, &best_costs));
+    assert_eq!(
+        true,
+        is_best_cost(
+            &Entry {
+                node: 1,
+                cost: 8,
+                arc_name: None,
+                prev_entry: None
+            },
+            &best_costs
+        )
+    );
     assert_eq!(
         false,
-        is_best_cost(&Entry { node: 1, cost: 11 }, &best_costs)
+        is_best_cost(
+            &Entry {
+                node: 1,
+                cost: 11,
+                arc_name: None,
+                prev_entry: None
+            },
+            &best_costs
+        )
     );
 }
 
@@ -150,7 +198,7 @@ fn test_dijsktra() {
 }
 
 fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {
-    let maybe_entry = run_dijsktra(source, destination, network, 0);
+    let maybe_entry = run_dijsktra(source, destination, network, 0, true);
 
     assert!(maybe_entry.is_some());
     assert_eq!(expected_cost, maybe_entry.unwrap().cost);
