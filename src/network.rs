@@ -90,7 +90,7 @@ fn serialize() {
             head_node: 2,
             distance: 1500,
             cost: 2,
-            partOfWay: Some("Foo Street".to_string())
+            part_of_way: Some("Foo Street".to_string()),
         },
     );
 

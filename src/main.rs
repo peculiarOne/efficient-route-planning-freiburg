@@ -27,9 +27,19 @@ fn main() {
     let oakham_braunston_road: NodeId = 18335097;
     let oakham_tolenthorpe_close: NodeId = 18334319;
     let oakham_woodland_view: NodeId = 18339438;
-    let result = dijkstra::run_dijsktra(oakham_the_avenue, oakham_woodland_view, &network, 8000, true);
+    let uppingham_queens_road: NodeId = 18327809;
+    let result = dijkstra::run_dijsktra(
+        oakham_braunston_road,
+        uppingham_queens_road,
+        &network,
+        15000,
+        true,
+    );
     match result {
-        Some(entry) => println!("path result: {:?}", entry),
+        Some(entry) => {
+            println!("path result cost: {}", entry.cost);
+            println!("ways travelled: {}", entry.report_traversed_ways());
+        }
         None => println!("no path found!!"),
     }
 }
@@ -95,21 +105,14 @@ fn process_osm_xml(xml_string: &str) -> Network {
 
     loop {
         match reader.read_event(&mut buf) {
-            Ok(Event::Start(ref e)) => {
-                // println!(
-                //     "start of tag {}, in_way={}",
-                //     String::from_utf8(e.name().to_vec()).unwrap(),
-                //     in_way
-                // );
-                match e.name() {
-                    b"way" => in_way = true,
-                    b"node" => {
-                        let n = extract_node(e).unwrap();
-                        graph.insert_node(n);
-                    }
-                    _ => (),
+            Ok(Event::Start(ref e)) => match e.name() {
+                b"way" => in_way = true,
+                b"node" => {
+                    let n = extract_node(e).unwrap();
+                    graph.insert_node(n);
                 }
-            }
+                _ => (),
+            },
             Ok(Event::Empty(ref e)) => {
                 match e.name() {
                     b"nd" if in_way => {
@@ -133,7 +136,7 @@ fn process_osm_xml(xml_string: &str) -> Network {
                         };
                     }
                     b"tag" if in_way => {
-                        way_is_highway |= is_highway(e);
+                        way_is_highway |= is_road(e);
                         way_is_oneway |= is_oneway(e);
                         match get_name(e) {
                             Some(name) => way_name = Some(name),
@@ -148,21 +151,23 @@ fn process_osm_xml(xml_string: &str) -> Network {
                 }
             }
             Ok(Event::End(ref e)) => {
-                // println!(
-                //     "start of tag {}",
-                //     String::from_utf8(e.name().to_vec()).unwrap()
-                // );
                 match e.name() {
                     b"way" => {
                         // TODO create arcs here including forward and reverse
                         if way_is_highway {
-                            let arcs = create_arcs(&graph, &way_nodes, way_is_oneway, way_name.as_ref().map(|n| n.as_str()));
+                            let arcs = create_arcs(
+                                &graph,
+                                &way_nodes,
+                                way_is_oneway,
+                                way_name.as_ref().map(|n| n.as_str()),
+                            );
                             for (k, v) in arcs.iter() {
                                 graph.insert_arc(*k, v.to_owned());
                             }
                         }
                         in_way = false;
                         way_is_highway = false;
+                        way_is_oneway = false;
                         way_name = None;
                         way_nodes.clear();
                     }
@@ -188,7 +193,7 @@ fn create_arcs(
     partial_network: &Network,
     way_nodes: &Vec<NodeId>,
     is_oneway: bool,
-    way_name: Option<&str>
+    way_name: Option<&str>,
 ) -> Vec<(NodeId, Arc)> {
     let mut way_iter = way_nodes.iter().peekable();
 
@@ -210,7 +215,7 @@ fn create_arcs(
                                 head_node: t.id,
                                 cost: cost,
                                 distance: dist,
-                                part_of_way: way_name.map(|n| n.into())
+                                part_of_way: way_name.map(|n| n.into()),
                             },
                         ));
 
@@ -221,7 +226,7 @@ fn create_arcs(
                                     head_node: f.id,
                                     cost: cost,
                                     distance: dist,
-                                    part_of_way: way_name.map(|n| n.into())
+                                    part_of_way: way_name.map(|n| n.into()),
                                 },
                             ));
                         }
@@ -274,24 +279,28 @@ fn extract_node(tag: &BytesStart) -> Result<Node, Box<dyn Error>> {
     }
 }
 
-fn is_highway(tag: &BytesStart) -> bool {
-    let osm_key = "k".as_bytes();
-    let osm_value = "v".as_bytes();
+const HIGHWAY_ROAD_TYPES: [&'static str; 13] = [
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary",
+    "unclassified",
+    "residential",
+    "motorway_link",
+    "trunk_link",
+    "primary_link",
+    "secondary_link",
+    "tertiary_link",
+    "service",
+];
 
-    let osm_highway = "highway".as_bytes();
-
-    let mut found_highway_tag = false;
-    for attribute in tag.attributes() {
-        match attribute {
-            Ok(ref attr) if attr.key == osm_key => {
-                if attr.unescaped_value().unwrap() == osm_highway {
-                    found_highway_tag = true;
-                }
-            }
-            _ => (),
-        }
+fn is_road(tag: &BytesStart) -> bool {
+    let highway_val = osm_tag_value(tag, "highway");
+    match highway_val {
+        Some(v) => HIGHWAY_ROAD_TYPES.contains(&v.as_str()),
+        None => false,
     }
-    found_highway_tag
 }
 
 fn is_oneway(tag: &BytesStart) -> bool {
@@ -377,7 +386,7 @@ mod rutland_tests {
     fn total_arcs() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
-        assert_eq!(33477, rutland_graph.total_arcs());
+        assert_eq!(42890, rutland_graph.total_arcs());
     }
 
     // <way id="3753821" version="1" timestamp="2006-10-20T13:33:58Z" changeset="0">

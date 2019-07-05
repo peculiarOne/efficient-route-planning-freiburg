@@ -7,10 +7,13 @@ use std::cmp::{Ord, Ordering};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 
+const DEBUG: bool = false;
+const REPORT_HEAP: bool = false;
+
 #[derive(Clone, Debug)]
 pub struct Entry<'a> {
     node: NodeId,
-    cost: u64,
+    pub cost: u64,
     arc_name: Option<&'a str>,
     prev_entry: Option<Box<Entry<'a>>>,
 }
@@ -34,12 +37,26 @@ impl<'a> Eq for Entry<'a> {}
 impl<'a> Entry<'a> {
     pub fn report_traversed_ways(&self) -> String {
         let mut prev_entries = vec![];
-        let mut prev = self.prev_entry;
+        let mut prev = &self.prev_entry;
 
-        while (prev.is_some()) {
-            prev_entries.push(prev);
+        while prev.is_some() {
+            match prev {
+                Some(p) => {
+                    prev_entries.push(p);
+                    prev = &p.prev_entry;
+                }
+                None => (),
+            }
         }
-    "some path".to_string()
+
+        let mut arc_names: Vec<&str> = prev_entries
+            .iter()
+            .map(|e| e.arc_name.unwrap_or("unknown"))
+            .collect();
+        arc_names.dedup();
+        arc_names.reverse();
+        let ways = arc_names.join("->");
+        ways
     }
 }
 
@@ -50,6 +67,10 @@ pub fn run_dijsktra(
     max_distance: u64,
     trace_path: bool,
 ) -> Option<Entry> {
+    if !graph.adjacent_arcs.contains_key(&target) {
+        println!("!!run_dijkstra. target not in network")
+    }
+
     let mut costs: HashMap<NodeId, u64> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
@@ -69,61 +90,70 @@ pub fn run_dijsktra(
             break;
         }
 
-        count += 1;
-        if count % 20 == 0 {
-            print_progress(&entry, &costs, &heap)
+        if DEBUG {
+            count += 1;
+            if count % 10 == 0 {
+                print_progress(&entry, &costs, &heap)
+            }
+            if REPORT_HEAP {
+                print_heap(&heap)
+            }
         }
-        debug!("assessing node {}", entry.node);
-        print_heap(&heap);
 
         if entry.node == target {
             return Some(entry);
         }
 
-        // if is_best_cost(&entry, &costs) {
-        {
-            // println!("found best cost of {} to node {}", entry.cost, entry.node);
-            let x = graph.adjacent_arcs.get(&entry.node);
+        let x = graph.adjacent_arcs.get(&entry.node);
 
-            x.map(|arcs| {
-                for arc in arcs {
-                    let arc_name = if trace_path { arc.part_of_way.as_ref().map(|s| s.as_str()) } else { None };
-                    let prev_entry = if trace_path { Some(Box::new(entry.clone())) } else { None };
-                    let arc_entry = Entry {
-                        node: arc.head_node,
-                        cost: arc.cost + entry.cost,
-                        arc_name: arc_name,
-                        prev_entry: prev_entry,
-                    };
-                    // println!("neighbouring arc to {}", arc.head_node);
-
-                    if is_best_cost(&arc_entry, &costs) {
-                        costs.insert(arc_entry.node, arc_entry.cost);
-                        heap.push(arc_entry);
-                    }
+        x.map(|arcs| {
+            for arc in arcs {
+                let arc_name = if trace_path {
+                    arc.part_of_way.as_ref().map(|s| s.as_str())
+                } else {
+                    None
+                };
+                let prev_entry = if trace_path {
+                    Some(Box::new(entry.clone()))
+                } else {
+                    None
+                };
+                let arc_entry = Entry {
+                    node: arc.head_node,
+                    cost: arc.cost + entry.cost,
+                    arc_name: arc_name,
+                    prev_entry: prev_entry,
+                };
+                if DEBUG && REPORT_HEAP {
+                    println!("\tneighbouring arc to {}, {:?}", arc.head_node, arc_name)
                 }
-            });
-        }
+
+                if is_best_cost(&arc_entry, &costs) {
+                    costs.insert(arc_entry.node, arc_entry.cost);
+                    heap.push(arc_entry);
+                }
+            }
+        });
     }
     None
 }
 
 fn print_progress(
-    currentEntry: &Entry,
+    current_entry: &Entry,
     best_costs: &HashMap<NodeId, u64>,
     heap: &BinaryHeap<Entry>,
 ) {
     println!("--");
     println!(
         "assessing node {} with cost {}",
-        currentEntry.node, currentEntry.cost
+        current_entry.node, current_entry.cost
     );
     println!("{} entries still in heap", heap.len());
     println!("{} entries in best_cost", best_costs.len());
 }
 
 fn print_heap(heap: &BinaryHeap<Entry>) {
-    debug!(
+    println!(
         "current heap <{}>",
         heap.iter()
             .map(|e| format!("(n:{}, c:{})", e.node, e.cost))
