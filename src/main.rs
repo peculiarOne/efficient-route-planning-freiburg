@@ -292,7 +292,8 @@ fn extract_node(tag: &BytesStart) -> Result<Node, Box<dyn Error>> {
             _ => (),
         }
     }
-    if id == 0 || lat == 0.0 || long == 0.0 {
+    // if id == 0 || lat == 0.0 || long == 0.0 {
+    if id == 0 {
         println!(
             "problem extracting node id {}, lat {}, long {}",
             id, lat, long
@@ -435,7 +436,7 @@ mod rutland_tests {
         let file = "data/rutland-tiny.osm.xml";
         let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
 
-        let network = process_osm_xml(&xml_string);
+        let network = load_network_from_string(&xml_string);
         // let network = from_osm_rutland();
 
         const START_NODE: NodeId = 18328098;
@@ -464,7 +465,7 @@ mod rutland_tests {
         let file = "data/oneway-way.osm.xml";
         let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
 
-        let network = process_osm_xml(&xml_string);
+        let network = load_network_from_string(&xml_string);
 
         const A_NODE: NodeId = 1917341728;
 
