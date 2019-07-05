@@ -15,13 +15,24 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use std::error::Error;
 use std::fs;
+use std::io::BufRead;
 use std::io::ErrorKind;
+use std::time::{Duration, Instant};
+
+// const OSM_DATA_FILE: &str = "data/rutland-latest.osm.xml";
+const OSM_DATA_FILE: &str = "/home/wayne/Downloads/great-britain-latest.osm.xml";
 
 fn main() {
     env_logger::init();
 
     println!("Hello, world!");
-    let network = from_osm_rutland();
+    let start_load_network = Instant::now();
+    let network = from_osm_file(OSM_DATA_FILE);
+    let duration_load_network = start_load_network.elapsed();
+    println!(
+        "time to load network {} {:?}",
+        OSM_DATA_FILE, duration_load_network
+    );
 
     let oakham_the_avenue: NodeId = 3711862961;
     let oakham_braunston_road: NodeId = 18335097;
@@ -42,14 +53,26 @@ fn main() {
         }
         None => println!("no path found!!"),
     }
+
+    let start = Instant::now();
+    let whole_network_result = dijkstra::run_dijsktra(oakham_the_avenue, 0, &network, 0, false);
+    let duration = start.elapsed();
+    println!("time to complete full dijkstra {:?}", duration);
 }
 
 fn from_osm_rutland() -> Network {
-    let file = "data/rutland-latest.osm.xml";
-    let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
+    from_osm_file("data/rutland-latest.osm.xml")
+}
 
+fn from_osm_file(file: &str) -> Network {
+    // let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
+
+    println!("process {}", file);
     // echo_xml(&xml_string);
-    process_osm_xml(&xml_string)
+    match load_network_from_file(file) {
+        Ok(network) => network,
+        _ => panic!("loading network failed"),
+    }
 }
 
 fn from_osm_dummy() -> Network {
@@ -64,7 +87,7 @@ fn from_osm_dummy() -> Network {
     </osm>"#;
 
     // echo_xml(&test_xml);
-    process_osm_xml(test_xml)
+    load_network_from_string(test_xml)
 }
 
 fn _echo_xml(xml_string: &str) -> () {
@@ -90,9 +113,17 @@ fn _echo_xml(xml_string: &str) -> () {
     }
 }
 
-fn process_osm_xml(xml_string: &str) -> Network {
-    let mut reader = Reader::from_str(&xml_string);
+fn load_network_from_file(file_path: &str) -> Result<Network, quick_xml::Error> {
+    let mut reader = Reader::from_file(&file_path)?;
+    Ok(load_network(reader))
+}
 
+fn load_network_from_string(xml_string: &str) -> Network {
+    let mut reader = Reader::from_str(xml_string);
+    load_network(reader)
+}
+
+fn load_network<B: BufRead>(mut reader: Reader<B>) -> Network {
     let mut buf = Vec::new();
     let mut in_way = false;
     let mut way_is_highway = false;
