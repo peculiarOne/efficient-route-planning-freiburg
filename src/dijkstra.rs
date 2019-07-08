@@ -1,7 +1,7 @@
 extern crate env_logger;
 extern crate log;
 
-use crate::network::{Network, NodeId};
+use crate::network::{Network, NodeIndex, OSMNodeId};
 
 use std::cmp::{Ord, Ordering};
 use std::collections::BinaryHeap;
@@ -12,7 +12,7 @@ const REPORT_HEAP: bool = false;
 
 #[derive(Clone, Debug)]
 pub struct Entry<'a> {
-    node: NodeId,
+    node: NodeIndex,
     pub cost: u64,
     arc_name: Option<&'a str>,
     prev_entry: Option<Box<Entry<'a>>>,
@@ -61,28 +61,35 @@ impl<'a> Entry<'a> {
 }
 
 pub fn run_dijsktra(
-    source: NodeId,
-    target: NodeId,
-    graph: &Network,
+    source: OSMNodeId,
+    target: OSMNodeId,
+    network: &Network,
     max_distance: u64,
     trace_path: bool,
 ) -> Option<Entry> {
-    if !graph.adjacent_arcs.contains_key(&target) {
+    if !network.get_node(&target).is_none() {
         println!("!!run_dijkstra. target not in network")
     }
 
-    let mut costs: HashMap<NodeId, u64> = HashMap::new();
+    let mut costs: HashMap<NodeIndex, u64> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
 
+    let maybe_source_index = network.node_indexes.get(&source);
+    let maybe_target_index = network.node_indexes.get(&source);
+    let (source_index, target_index) = match (maybe_source_index, maybe_target_index) {
+        (Some(s), Some(t)) => (*s,*t),
+        _ => return None
+    };
+
     // best_costs.insert(source, 0);
     heap.push(Entry {
-        node: source,
+        node: source_index,
         cost: 0,
         arc_name: None,
         prev_entry: None,
     });
-    costs.insert(source, 0);
+    costs.insert(source_index, 0);
 
     let mut count = 0;
     while let Some(entry) = heap.pop() {
@@ -100,13 +107,12 @@ pub fn run_dijsktra(
             }
         }
 
-        if entry.node == target {
+        if entry.node == target_index {
             return Some(entry);
         }
 
-        let x = graph.adjacent_arcs.get(&entry.node);
+        let arcs = &network.forward_graph[entry.node];
 
-        x.map(|arcs| {
             for arc in arcs {
                 let arc_name = if trace_path {
                     arc.part_of_way.as_ref().map(|s| s.as_str())
@@ -132,15 +138,14 @@ pub fn run_dijsktra(
                     costs.insert(arc_entry.node, arc_entry.cost);
                     heap.push(arc_entry);
                 }
-            }
-        });
+        };
     }
     None
 }
 
 fn print_progress(
     current_entry: &Entry,
-    best_costs: &HashMap<NodeId, u64>,
+    best_costs: &HashMap<NodeIndex, u64>,
     heap: &BinaryHeap<Entry>,
 ) {
     println!("--");
@@ -162,7 +167,7 @@ fn print_heap(heap: &BinaryHeap<Entry>) {
     );
 }
 
-fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeId, u64>) -> bool {
+fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeIndex, u64>) -> bool {
     let maybe_best = best_costs.get(&entry.node);
     match maybe_best {
         Some(existing_best) if entry.cost < *existing_best => true,
@@ -231,7 +236,7 @@ mod dijkstra_test {
         do_disjktra(&dummy_network, 5, 4, 5);
     }
 
-    fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {
+    fn do_disjktra(network: &Network, source: OSMNodeId, destination: OSMNodeId, expected_cost: u64) {
         let maybe_entry = run_dijsktra(source, destination, network, 0, true);
 
         assert!(maybe_entry.is_some());

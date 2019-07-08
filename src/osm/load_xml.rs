@@ -1,28 +1,32 @@
+use failure;
 use failure::Fail;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
-use std::error::Error;
+use std::error;
 use std::io::BufRead;
 use std::io::ErrorKind;
 
-use crate::network;
+use crate::network::{Arc, Network, NetworkBuilder, Node, OSMNodeId};
 use crate::utils;
 
 use crate::osm::constants;
 
-pub fn load_network_from_file(file_path: &str) -> Result<network::Network, quick_xml::Error> {
-    let reader = Reader::from_file(&file_path)?;
-    Ok(load_network(reader))
+pub fn load_network_from_file(file_path: &str) -> Result<Network, Box<dyn error::Error>> {
+    let reader = Reader::from_file(&file_path).map_err(|e| e.compat())?;
+    load_network(reader).ok_or(Box::new(std::io::Error::new(
+        ErrorKind::Other,
+        "failed to load network",
+    )))
 }
 
 #[cfg(test)]
-pub fn load_network_from_string(xml_string: &str) -> network::Network {
+pub fn load_network_from_string(xml_string: &str) -> Option<Network> {
     let reader = Reader::from_str(xml_string);
     load_network(reader)
 }
 
-fn load_network<B: BufRead>(mut reader: Reader<B>) -> network::Network {
+fn load_network<B: BufRead>(mut reader: Reader<B>) -> Option<Network> {
     let mut buf = Vec::new();
     let mut in_way = false;
     let mut way_is_highway = false;
@@ -31,7 +35,7 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> network::Network {
 
     let mut way_nodes = vec![];
 
-    let mut graph = network::Network::new();
+    let mut graph = NetworkBuilder::new();
 
     loop {
         match reader.read_event(&mut buf) {
@@ -49,13 +53,13 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> network::Network {
                         // println!("<nd> found in way");
                         // TODO attributes() returns an iterator. need to find the "ref" attribute
                         let node_ref = e.attributes().next().unwrap();
-                        let val: Option<network::NodeId> = match &node_ref {
+                        let val: Option<OSMNodeId> = match &node_ref {
                             Ok(Attribute {
                                 key: b"ref",
                                 value: v,
                             }) => {
                                 let s = String::from_utf8(v.to_vec()).unwrap();
-                                let id: u64 = s.parse().unwrap();
+                                let id: u32 = s.parse().unwrap();
                                 Some(id)
                             }
                             _ => None,
@@ -110,16 +114,19 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> network::Network {
         buf.clear();
     }
 
-    println!("read network with {} nodes", &graph.nodes.len());
     println!(
         "read network with {} outbound arcs ",
         &graph.adjacent_arcs.len()
     );
 
-    graph
+    let network = graph.build_network();
+    // if network.is_some() {
+    //     println!("read network with {} nodes", &network.unwrap().node_count());
+    // }
+    network
 }
 
-fn extract_node(tag: &BytesStart) -> Result<network::Node, Box<dyn Error>> {
+fn extract_node(tag: &BytesStart) -> Result<Node, Box<dyn error::Error>> {
     let mut id = 0;
     let mut lat = 0.0;
     let mut long = 0.0;
@@ -128,7 +135,7 @@ fn extract_node(tag: &BytesStart) -> Result<network::Node, Box<dyn Error>> {
             Attribute {
                 key: b"id",
                 value: v,
-            } => id = utils::bytes_to_string(v)?.parse::<network::NodeId>()?,
+            } => id = utils::bytes_to_string(v)?.parse::<OSMNodeId>()?,
             Attribute {
                 key: b"lat",
                 value: v,
@@ -151,7 +158,7 @@ fn extract_node(tag: &BytesStart) -> Result<network::Node, Box<dyn Error>> {
             "invalid node",
         )))
     } else {
-        Ok(network::Node {
+        Ok(Node {
             id: id,
             latitude: lat,
             longitude: long,
@@ -160,11 +167,11 @@ fn extract_node(tag: &BytesStart) -> Result<network::Node, Box<dyn Error>> {
 }
 
 fn create_arcs(
-    partial_network: &network::Network,
-    way_nodes: &Vec<network::NodeId>,
+    partial_network: &NetworkBuilder,
+    way_nodes: &Vec<OSMNodeId>,
     is_oneway: bool,
     way_name: Option<&str>,
-) -> Vec<(network::NodeId, network::Arc)> {
+) -> Vec<(OSMNodeId, Arc<OSMNodeId>)> {
     let mut way_iter = way_nodes.iter().peekable();
 
     let mut arcs = vec![];
@@ -181,7 +188,7 @@ fn create_arcs(
 
                         arcs.push((
                             f.id,
-                            network::Arc {
+                            Arc {
                                 head_node: t.id,
                                 cost: cost,
                                 distance: dist,
@@ -192,7 +199,7 @@ fn create_arcs(
                         if !is_oneway {
                             arcs.push((
                                 t.id,
-                                network::Arc {
+                                Arc {
                                     head_node: f.id,
                                     cost: cost,
                                     distance: dist,
@@ -265,7 +272,7 @@ fn osm_tag_value(tag: &BytesStart, key_to_match: &str) -> Option<String> {
     }
 }
 
-fn calculate_distance(a: &network::Node, b: &network::Node) -> (u64) {
+fn calculate_distance(a: &Node, b: &Node) -> (u64) {
     let from_lat_long = (a.latitude, a.longitude);
     let to_lat_long = (b.latitude, b.longitude);
     utils::haversine_distance_metres(from_lat_long, to_lat_long)

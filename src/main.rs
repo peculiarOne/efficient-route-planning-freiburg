@@ -9,7 +9,7 @@ mod utils;
 
 mod osm;
 
-use network::{Network, NodeId};
+use network::{Network, OSMNodeId};
 use osm::load_xml;
 
 use quick_xml::events::Event;
@@ -31,11 +31,11 @@ fn main() {
         OSM_DATA_FILE, duration_load_network
     );
 
-    let oakham_the_avenue: NodeId = 3711862961;
-    let oakham_braunston_road: NodeId = 18335097;
-    let oakham_tolenthorpe_close: NodeId = 18334319;
-    let oakham_woodland_view: NodeId = 18339438;
-    let uppingham_queens_road: NodeId = 18327809;
+    let oakham_the_avenue: OSMNodeId = 3711862961;
+    let oakham_braunston_road: OSMNodeId = 18335097;
+    let oakham_tolenthorpe_close: OSMNodeId = 18334319;
+    let oakham_woodland_view: OSMNodeId = 18339438;
+    let uppingham_queens_road: OSMNodeId = 18327809;
     let result = dijkstra::run_dijsktra(
         oakham_braunston_road,
         uppingham_queens_road,
@@ -73,7 +73,7 @@ fn from_osm_file(file: &str) -> Network {
 }
 
 #[cfg(test)]
-fn from_osm_dummy() -> Network {
+fn from_osm_dummy() -> Option<Network> {
     let test_xml = r#"<osm>
 	<node>
 		<tag k="odbl" v="clean"/>
@@ -122,7 +122,7 @@ mod rutland_tests {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
 
-        let node = rutland_graph.nodes.get(&488432);
+        let node = rutland_graph.get_node(&488432);
         assert!(node.is_some());
         assert_eq!(52.6555853, node.unwrap().latitude);
         assert_eq!(-0.5134241, node.unwrap().longitude);
@@ -132,14 +132,14 @@ mod rutland_tests {
     fn total_nodes() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
-        assert_eq!(119638, rutland_graph.nodes.len());
+        assert_eq!(119638, rutland_graph.node_count());
     }
 
     #[test]
     fn total_arcs() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
-        assert_eq!(42890, rutland_graph.total_arcs());
+        assert_eq!(42890, rutland_graph.arc_count());
     }
 
     // <way id="3753821" version="1" timestamp="2006-10-20T13:33:58Z" changeset="0">
@@ -157,11 +157,11 @@ mod rutland_tests {
         let file = "data/rutland-tiny.osm.xml";
         let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
 
-        let network = load_xml::load_network_from_string(&xml_string);
+        let network = load_xml::load_network_from_string(&xml_string).unwrap();
         // let network = from_osm_rutland();
 
-        const START_NODE: NodeId = 18328098;
-        let highways = network
+        const START_NODE: OSMNodeId = 18328098;
+        let highways = network.get_node(&START_NODE)
             .adjacent_arcs
             .get(&START_NODE)
             .expect("couldn't find chesnut close");
@@ -171,7 +171,7 @@ mod rutland_tests {
 
     #[test]
     fn not_a_highway() {
-        const LANDUSE_BOUNDARY_START: NodeId = 19549583;
+        const LANDUSE_BOUNDARY_START: OSMNodeId = 19549583;
 
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
@@ -186,12 +186,12 @@ mod rutland_tests {
         let file = "data/oneway-way.osm.xml";
         let xml_string = fs::read_to_string(file).expect("couldn't read osm file");
 
-        let network = load_xml::load_network_from_string(&xml_string);
+        let network = load_xml::load_network_from_string(&xml_string).unwrap();
 
-        const A_NODE: NodeId = 1917341728;
+        const A_NODE: OSMNodeId = 1917341728;
 
         println!("network: {}", &network.to_json().unwrap());
-        assert_eq!(12, network.total_arcs());
+        assert_eq!(12, network.arc_count());
         assert_eq!(1, network.adjacent_arcs.get(&A_NODE).unwrap().len());
     }
 }
