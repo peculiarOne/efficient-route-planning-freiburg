@@ -171,71 +171,75 @@ fn is_best_cost(entry: &Entry, best_costs: &HashMap<NodeId, u64>) -> bool {
     }
 }
 
-#[test]
-fn test_best_cost() {
-    assert_eq!(
-        true,
-        is_best_cost(
-            &Entry {
-                node: 1,
-                cost: 10,
-                arc_name: None,
-                prev_entry: None
-            },
-            &HashMap::new()
-        )
-    );
+#[cfg(test)]
+mod dijkstra_test {
+    use super::*;
 
-    let mut best_costs = HashMap::new();
-    best_costs.insert(1, 9);
+    #[test]
+    fn test_best_cost() {
+        assert_eq!(
+            true,
+            is_best_cost(
+                &Entry {
+                    node: 1,
+                    cost: 10,
+                    arc_name: None,
+                    prev_entry: None
+                },
+                &HashMap::new()
+            )
+        );
 
-    assert_eq!(
-        true,
-        is_best_cost(
-            &Entry {
-                node: 1,
-                cost: 8,
-                arc_name: None,
-                prev_entry: None
-            },
-            &best_costs
-        )
-    );
-    assert_eq!(
-        false,
-        is_best_cost(
-            &Entry {
-                node: 1,
-                cost: 11,
-                arc_name: None,
-                prev_entry: None
-            },
-            &best_costs
-        )
-    );
-}
+        let mut best_costs = HashMap::new();
+        best_costs.insert(1, 9);
 
-#[test]
-fn test_dijsktra() {
-    let dummy_network = make_dummy_network();
+        assert_eq!(
+            true,
+            is_best_cost(
+                &Entry {
+                    node: 1,
+                    cost: 8,
+                    arc_name: None,
+                    prev_entry: None
+                },
+                &best_costs
+            )
+        );
+        assert_eq!(
+            false,
+            is_best_cost(
+                &Entry {
+                    node: 1,
+                    cost: 11,
+                    arc_name: None,
+                    prev_entry: None
+                },
+                &best_costs
+            )
+        );
+    }
 
-    do_disjktra(&dummy_network, 4, 2, 7);
-    do_disjktra(&dummy_network, 1, 4, 4);
-    do_disjktra(&dummy_network, 1, 3, 2);
-    do_disjktra(&dummy_network, 1, 5, 4);
-    do_disjktra(&dummy_network, 2, 5, 6);
-    do_disjktra(&dummy_network, 5, 4, 5);
-}
+    #[test]
+    fn test_dijsktra() {
+        let dummy_network = make_dummy_network();
 
-fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {
-    let maybe_entry = run_dijsktra(source, destination, network, 0, true);
+        do_disjktra(&dummy_network, 4, 2, 7);
+        do_disjktra(&dummy_network, 1, 4, 4);
+        do_disjktra(&dummy_network, 1, 3, 2);
+        do_disjktra(&dummy_network, 1, 5, 4);
+        do_disjktra(&dummy_network, 2, 5, 6);
+        do_disjktra(&dummy_network, 5, 4, 5);
+    }
 
-    assert!(maybe_entry.is_some());
-    assert_eq!(expected_cost, maybe_entry.unwrap().cost);
-}
+    fn do_disjktra(network: &Network, source: NodeId, destination: NodeId, expected_cost: u64) {
+        let maybe_entry = run_dijsktra(source, destination, network, 0, true);
 
-fn make_dummy_network() -> Network {
-    let network_json = r#"{
+        assert!(maybe_entry.is_some());
+        assert_eq!(expected_cost, maybe_entry.unwrap().cost);
+    }
+
+    fn make_dummy_network() -> Network {
+        let network_json = r#"{
         "nodes":{},
         "adjacent_arcs":{
             "1": [{"head_node": 4, "distance": 4, "cost": 4}, {"head_node": 2, "distance": 5, "cost": 5},{"head_node": 3, "distance": 2, "cost": 2}],
@@ -246,5 +250,6 @@ fn make_dummy_network() -> Network {
         }
     }
     "#;
-    Network::from_json(network_json).unwrap()
+        Network::from_json(network_json).unwrap()
+    }
 }

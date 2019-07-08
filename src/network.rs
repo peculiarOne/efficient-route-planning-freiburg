@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Result;
 
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+
+#[cfg(test)]
+use serde_json::Result;
 
 pub type NodeId = u64;
 
@@ -45,6 +47,7 @@ impl Network {
         }
     }
 
+    #[cfg(test)]
     pub fn from_json(json: &str) -> Result<Network> {
         serde_json::from_str(json)
     }
@@ -66,6 +69,7 @@ impl Network {
         self.adjacent_arcs.values().map(|v| v.len()).sum()
     }
 
+    #[cfg(test)]
     pub fn to_json(&self) -> Result<String> {
         serde_json::to_string(self)
     }

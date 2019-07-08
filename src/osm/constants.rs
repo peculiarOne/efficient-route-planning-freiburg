@@ -1,0 +1,15 @@
+pub const HIGHWAY_ROAD_TYPES: [&'static str; 13] = [
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary",
+    "unclassified",
+    "residential",
+    "motorway_link",
+    "trunk_link",
+    "primary_link",
+    "secondary_link",
+    "tertiary_link",
+    "service",
+];
