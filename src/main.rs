@@ -16,8 +16,8 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::time::Instant;
 
-// const OSM_DATA_FILE: &str = "data/rutland-latest.osm.xml";
-const OSM_DATA_FILE: &str = "/home/wayne/Downloads/great-britain-latest.osm.xml";
+const OSM_DATA_FILE: &str = "data/rutland-latest.osm.xml";
+// const OSM_DATA_FILE: &str = "/home/waynec/Downloads/great-britain-latest.osm.xml";
 
 fn main() {
     env_logger::init();
@@ -124,15 +124,16 @@ mod rutland_tests {
 
         let node = rutland_graph.get_node(&488432);
         assert!(node.is_some());
-        assert_eq!(52.6555853, node.unwrap().latitude);
-        assert_eq!(-0.5134241, node.unwrap().longitude);
+        let lat_long = node.unwrap().lat_long_f64();
+        assert_eq!(52.6555853, lat_long.0);
+        assert_eq!(-0.5134241, lat_long.1);
     }
 
     #[test]
     fn total_nodes() {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
-        assert_eq!(119638, rutland_graph.node_count());
+        assert_eq!(21239, rutland_graph.node_count());
     }
 
     #[test]
@@ -161,9 +162,7 @@ mod rutland_tests {
         // let network = from_osm_rutland();
 
         const START_NODE: OSMNodeId = 18328098;
-        let highways = network.get_node(&START_NODE)
-            .adjacent_arcs
-            .get(&START_NODE)
+        let highways = network.fwd_arcs_from_node(&START_NODE)
             .expect("couldn't find chesnut close");
         println!("chestnut close adjacent arcs: {:?}", highways);
         assert_eq!(3, highways.len());
@@ -176,8 +175,7 @@ mod rutland_tests {
         // TODO can we use a common Network across tests?
         let rutland_graph: Network = from_osm_rutland();
         assert!(rutland_graph
-            .adjacent_arcs
-            .get(&LANDUSE_BOUNDARY_START)
+            .fwd_arcs_from_node(&LANDUSE_BOUNDARY_START)
             .is_none());
     }
 
@@ -190,8 +188,8 @@ mod rutland_tests {
 
         const A_NODE: OSMNodeId = 1917341728;
 
-        println!("network: {}", &network.to_json().unwrap());
+        // println!("network: {}", &network.to_json().unwrap());
         assert_eq!(12, network.arc_count());
-        assert_eq!(1, network.adjacent_arcs.get(&A_NODE).unwrap().len());
+        assert_eq!(1, network.fwd_arcs_from_node(&A_NODE).unwrap().len());
     }
 }

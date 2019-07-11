@@ -1,7 +1,7 @@
 extern crate env_logger;
 extern crate log;
 
-use crate::network::{Network, NodeIndex, OSMNodeId};
+use crate::network::{Network, NetworkBuilder, NodeIndex, OSMNodeId};
 
 use std::cmp::{Ord, Ordering};
 use std::collections::BinaryHeap;
@@ -67,7 +67,7 @@ pub fn run_dijsktra(
     max_distance: u64,
     trace_path: bool,
 ) -> Option<Entry> {
-    if !network.get_node(&target).is_none() {
+    if network.get_node(&target).is_none() {
         println!("!!run_dijkstra. target not in network")
     }
 
@@ -76,10 +76,13 @@ pub fn run_dijsktra(
     let mut heap = BinaryHeap::new();
 
     let maybe_source_index = network.node_indexes.get(&source);
-    let maybe_target_index = network.node_indexes.get(&source);
+    let maybe_target_index = network.node_indexes.get(&target);
     let (source_index, target_index) = match (maybe_source_index, maybe_target_index) {
         (Some(s), Some(t)) => (*s,*t),
-        _ => return None
+        _ => {
+            println!("dijkstra. Couldn't find source & target indexes");
+            return None
+        }
     };
 
     // best_costs.insert(source, 0);
@@ -99,7 +102,7 @@ pub fn run_dijsktra(
 
         if DEBUG {
             count += 1;
-            if count % 10 == 0 {
+            if count % 1 == 0 {
                 print_progress(&entry, &costs, &heap)
             }
             if REPORT_HEAP {
@@ -108,14 +111,17 @@ pub fn run_dijsktra(
         }
 
         if entry.node == target_index {
+            println!("dijkstra. finished");
             return Some(entry);
         }
 
         let arcs = &network.forward_graph[entry.node];
+        if DEBUG { println!("forward arcs from {}, {:?}", entry.node, arcs.iter())}
 
             for arc in arcs {
                 let arc_name = if trace_path {
-                    arc.part_of_way.as_ref().map(|s| s.as_str())
+                    // arc.part_of_way.as_ref().map(|s| s.as_str())
+                    network.get_way_info(&arc).and_then(|i| i.name.as_ref().map(String::as_str))
                 } else {
                     None
                 };
@@ -228,33 +234,45 @@ mod dijkstra_test {
     fn test_dijsktra() {
         let dummy_network = make_dummy_network();
 
-        do_disjktra(&dummy_network, 4, 2, 7);
-        do_disjktra(&dummy_network, 1, 4, 4);
-        do_disjktra(&dummy_network, 1, 3, 2);
-        do_disjktra(&dummy_network, 1, 5, 4);
-        do_disjktra(&dummy_network, 2, 5, 6);
-        do_disjktra(&dummy_network, 5, 4, 5);
+        do_disjktra(&dummy_network, 94, 92, 7);
+        do_disjktra(&dummy_network, 91, 94, 4);
+        do_disjktra(&dummy_network, 91, 93, 2);
+        do_disjktra(&dummy_network, 91, 95, 4);
+        do_disjktra(&dummy_network, 92, 95, 6);
+        do_disjktra(&dummy_network, 95, 94, 5);
     }
 
     fn do_disjktra(network: &Network, source: OSMNodeId, destination: OSMNodeId, expected_cost: u64) {
         let maybe_entry = run_dijsktra(source, destination, network, 0, true);
 
+        println!("\ndo_dijkstra network; {:?}", network);
+
         assert!(maybe_entry.is_some());
-        assert_eq!(expected_cost, maybe_entry.unwrap().cost);
+        let entry = maybe_entry.unwrap();
+        println!("dijkstra result, {:?}", entry);
+        assert_eq!(expected_cost, entry.cost);
     }
 
     fn make_dummy_network() -> Network {
         let network_json = r#"{
-        "nodes":{},
+        "all_nodes":{
+            "91": {"id": 91, "latitude": 0, "longitude": 0},
+            "92": {"id": 92, "latitude": 0, "longitude": 0},
+            "93": {"id": 93, "latitude": 0, "longitude": 0},
+            "94": {"id": 94, "latitude": 0, "longitude": 0},
+            "95": {"id": 95, "latitude": 0, "longitude": 0}
+        },
+        "used_nodes":[],
+        "way_info":{},
         "adjacent_arcs":{
-            "1": [{"head_node": 4, "distance": 4, "cost": 4}, {"head_node": 2, "distance": 5, "cost": 5},{"head_node": 3, "distance": 2, "cost": 2}],
-            "2": [{"head_node": 1, "distance": 5, "cost": 5}, {"head_node": 3, "distance": 4, "cost": 4},{"head_node": 5, "distance": 8, "cost": 8}],
-            "3": [{"head_node": 1, "distance": 2, "cost": 2}, {"head_node": 2, "distance": 4, "cost": 4},{"head_node": 5, "distance": 2, "cost": 2},{"head_node": 4, "distance": 3, "cost": 3}],
-            "4": [{"head_node": 1, "distance": 4, "cost": 4}, {"head_node": 3, "distance": 3, "cost": 3}],
-            "5": [{"head_node": 2, "distance": 8, "cost": 8}, {"head_node": 3, "distance": 2, "cost": 2}]
+            "91": [{"head_node": 94, "distance": 4, "cost": 4, "part_of_way": 1}, {"head_node": 92, "distance": 5, "cost": 5, "part_of_way": 1},{"head_node": 93, "distance": 2, "cost": 2, "part_of_way": 1}],
+            "92": [{"head_node": 91, "distance": 5, "cost": 5, "part_of_way": 1}, {"head_node": 93, "distance": 4, "cost": 4, "part_of_way": 1},{"head_node": 95, "distance": 8, "cost": 8, "part_of_way": 1}],
+            "93": [{"head_node": 91, "distance": 2, "cost": 2, "part_of_way": 1}, {"head_node": 92, "distance": 4, "cost": 4, "part_of_way": 1},{"head_node": 95, "distance": 2, "cost": 2, "part_of_way": 1},{"head_node": 94, "distance": 3, "cost": 3, "part_of_way": 1}],
+            "94": [{"head_node": 91, "distance": 4, "cost": 4, "part_of_way": 1}, {"head_node": 93, "distance": 3, "cost": 3, "part_of_way": 1}],
+            "95": [{"head_node": 92, "distance": 8, "cost": 8, "part_of_way": 1}, {"head_node": 93, "distance": 2, "cost": 2, "part_of_way": 1}]
         }
     }
     "#;
-        Network::from_json(network_json).unwrap()
+        NetworkBuilder::from_json(network_json).unwrap().build_network().unwrap()
     }
 }

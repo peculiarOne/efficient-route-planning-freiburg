@@ -7,7 +7,8 @@ use std::error;
 use std::io::BufRead;
 use std::io::ErrorKind;
 
-use crate::network::{Arc, Network, NetworkBuilder, Node, OSMNodeId};
+use crate::network;
+use crate::network::{Arc, Network, NetworkBuilder, Node, OSMNodeId, OSMWayId, WayInfo};
 use crate::utils;
 
 use crate::osm::constants;
@@ -32,15 +33,21 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> Option<Network> {
     let mut way_is_highway = false;
     let mut way_is_oneway = false;
     let mut way_name = None;
+    let mut way_id = 0;
 
     let mut way_nodes = vec![];
 
     let mut graph = NetworkBuilder::new();
 
+    println!("enter load_network");
+
     loop {
         match reader.read_event(&mut buf) {
             Ok(Event::Start(ref e)) => match e.name() {
-                b"way" => in_way = true,
+                b"way" => {
+                    in_way = true;
+                    way_id = get_attribute(e, "id").unwrap().parse::<u64>().unwrap();
+                    }
                 b"node" => {
                     let n = extract_node(e).unwrap();
                     graph.insert_node(n);
@@ -59,7 +66,7 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> Option<Network> {
                                 value: v,
                             }) => {
                                 let s = String::from_utf8(v.to_vec()).unwrap();
-                                let id: u32 = s.parse().unwrap();
+                                let id: OSMNodeId = s.parse().unwrap();
                                 Some(id)
                             }
                             _ => None,
@@ -93,11 +100,12 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> Option<Network> {
                                 &graph,
                                 &way_nodes,
                                 way_is_oneway,
-                                way_name.as_ref().map(|n| n.as_str()),
+                                way_id,
                             );
                             for (k, v) in arcs.iter() {
                                 graph.insert_arc(*k, v.to_owned());
                             }
+                            graph.insert_way_info(WayInfo { id: way_id, name: way_name })
                         }
                         in_way = false;
                         way_is_highway = false;
@@ -113,6 +121,7 @@ fn load_network<B: BufRead>(mut reader: Reader<B>) -> Option<Network> {
         }
         buf.clear();
     }
+    println!("about to call build_network");
 
     println!(
         "read network with {} outbound arcs ",
@@ -160,8 +169,8 @@ fn extract_node(tag: &BytesStart) -> Result<Node, Box<dyn error::Error>> {
     } else {
         Ok(Node {
             id: id,
-            latitude: lat,
-            longitude: long,
+            latitude: network::degrees_to_i32(lat),
+            longitude: network::degrees_to_i32(long),
         })
     }
 }
@@ -170,7 +179,7 @@ fn create_arcs(
     partial_network: &NetworkBuilder,
     way_nodes: &Vec<OSMNodeId>,
     is_oneway: bool,
-    way_name: Option<&str>,
+    way_id: OSMWayId,
 ) -> Vec<(OSMNodeId, Arc<OSMNodeId>)> {
     let mut way_iter = way_nodes.iter().peekable();
 
@@ -192,7 +201,7 @@ fn create_arcs(
                                 head_node: t.id,
                                 cost: cost,
                                 distance: dist,
-                                part_of_way: way_name.map(|n| n.into()),
+                                part_of_way: way_id,
                             },
                         ));
 
@@ -203,7 +212,7 @@ fn create_arcs(
                                     head_node: f.id,
                                     cost: cost,
                                     distance: dist,
-                                    part_of_way: way_name.map(|n| n.into()),
+                                    part_of_way: way_id,
                                 },
                             ));
                         }
@@ -272,10 +281,28 @@ fn osm_tag_value(tag: &BytesStart, key_to_match: &str) -> Option<String> {
     }
 }
 
+fn get_attribute(tag: &BytesStart, key: &str) -> Option<String> {
+    for attribute in tag.attributes() {
+        match attribute {
+            Ok(ref attr) if attr.key == key.as_bytes() => {
+                let value = String::from_utf8(
+                    attr.unescaped_value()
+                        .unwrap()
+                        .iter()
+                        .map(|u| *u)
+                        .collect::<Vec<_>>(),
+                )
+                .ok();
+                return value
+            }
+            _ => (),
+        }
+    };
+    None
+}
+
 fn calculate_distance(a: &Node, b: &Node) -> (u64) {
-    let from_lat_long = (a.latitude, a.longitude);
-    let to_lat_long = (b.latitude, b.longitude);
-    utils::haversine_distance_metres(from_lat_long, to_lat_long)
+    utils::haversine_distance_metres(a.lat_long_f64(), b.lat_long_f64())
 }
 
 fn calculate_cost(distance: u64) -> (u64) {
